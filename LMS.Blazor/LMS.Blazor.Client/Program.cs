@@ -20,6 +20,7 @@ internal class Program
 
         builder.Services.AddScoped<IApiService, ClientApiService>();
         builder.Services.AddScoped<ICourseService, CourseService>();
+        builder.Services.AddScoped<IStudentCourseClientService, StudentCourseClientService>();
 
         await builder.Build().RunAsync();
     }

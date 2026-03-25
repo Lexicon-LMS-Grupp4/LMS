@@ -12,6 +12,12 @@ public class ServerNoOpApiService(ILogger<ServerNoOpApiService> logger) : IApiSe
         return Task.FromResult<T?>(default);
     }
 
+    public Task<T?> GetAllowNotFoundAsync<T>(string endpoint, CancellationToken ct = default)
+    {
+        _logger.LogWarning("ServerNoOpApiService called for: {Endpoint}", endpoint);
+        return Task.FromResult<T?>(default);
+    }
+
     public Task<T?> PostAsync<T>(string endpoint, object body, CancellationToken ct = default)
     {
         _logger.LogWarning("ServerNoOpApiService called for: {Endpoint}", endpoint);

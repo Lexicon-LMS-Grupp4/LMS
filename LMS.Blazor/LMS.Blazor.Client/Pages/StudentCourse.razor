@@ -1,0 +1,126 @@
+@page "/student/course"
+@attribute [Authorize(Roles = "Student")]
+@using System.Net.Http
+@using LMS.Shared.DTOs.Course
+@using LMS.Shared.DTOs.User
+@inject IStudentCourseClientService StudentCourseClient
+
+<PageTitle>My course</PageTitle>
+
+<div class="container-fluid py-4">
+    <h2 class="mb-4">My course</h2>
+
+    @if (isLoading)
+    {
+        <div class="text-center py-5">
+            <div class="spinner-border text-primary" role="status"></div>
+            <p class="mt-2 text-muted">Loading...</p>
+        </div>
+    }
+    else if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger">
+            <p class="mb-0">@errorMessage</p>
+            <button type="button" class="btn btn-outline-danger btn-sm mt-2" @onclick="LoadAsync">Retry</button>
+        </div>
+    }
+    else if (course is null)
+    {
+        <div class="alert alert-info">
+            No enrolled course found. You may not be assigned to a course, or your account is not in the Student role for API access.
+        </div>
+    }
+    else
+    {
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">@course.Name</h5>
+                <span class="badge bg-secondary">@course.StudentCount students</span>
+            </div>
+            <div class="card-body">
+                <p class="text-muted small mb-1">Description</p>
+                <p>@course.Description</p>
+                <div class="row mt-3">
+                    <div class="col-md-4">
+                        <p class="text-muted small mb-1">Start</p>
+                        <p>@course.StartDate.ToString("yyyy-MM-dd")</p>
+                    </div>
+                    <div class="col-md-4">
+                        <p class="text-muted small mb-1">Modules</p>
+                        <p>@course.ModuleCount</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Classmates</h5>
+            </div>
+            <div class="card-body p-0">
+                @if (classmates.Count == 0)
+                {
+                    <p class="p-3 mb-0 text-muted">No other students in this course.</p>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-striped mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Email</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var s in classmates)
+                                {
+                                    <tr>
+                                        <td>@s.Name</td>
+                                        <td>@s.Email</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private bool isLoading = true;
+    private string? errorMessage;
+    private CourseDto? course;
+    private IReadOnlyList<StudentDto> classmates = Array.Empty<StudentDto>();
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        isLoading = true;
+        errorMessage = null;
+        course = null;
+        classmates = Array.Empty<StudentDto>();
+
+        try
+        {
+            course = await StudentCourseClient.GetMyCourseAsync();
+            if (course is not null)
+                classmates = await StudentCourseClient.GetClassmatesAsync();
+        }
+        catch (HttpRequestException ex)
+        {
+            errorMessage = $"Could not reach the API: {ex.Message}";
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+}

@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components;
+using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 
@@ -25,6 +26,16 @@ public class ClientApiService : IApiService
     public async Task<T?> GetAsync<T>(string endpoint, CancellationToken ct = default)
     {
         var response = await _httpClient.GetAsync($"api/proxy/{endpoint}", ct);
+        HandleUnauthorized(response);
+        response.EnsureSuccessStatusCode();
+        return await DeserializeAsync<T>(response, ct);
+    }
+
+    public async Task<T?> GetAllowNotFoundAsync<T>(string endpoint, CancellationToken ct = default)
+    {
+        var response = await _httpClient.GetAsync($"api/proxy/{endpoint.TrimStart('/')}", ct);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+            return default;
         HandleUnauthorized(response);
         response.EnsureSuccessStatusCode();
         return await DeserializeAsync<T>(response, ct);

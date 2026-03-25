@@ -1,4 +1,4 @@
-﻿using Domain.Models.Configurations;
+using Domain.Models.Configurations;
 using LMS.Infractructure.Data;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
@@ -23,6 +23,12 @@ public static class AuthServiceExtension
                          .GetSection(JwtSettings.Section)
                          .Get<JwtSettings>()
                          ?? throw new InvalidOperationException("JwtSettings section is missing or invalid.");
+
+        if (string.IsNullOrWhiteSpace(jwtSettings.SecretKey))
+        {
+            throw new InvalidOperationException(
+                "JwtSettings:SecretKey is missing or empty. Add it to appsettings (e.g. appsettings.Development.json), user secrets: JwtSettings:SecretKey, or environment variables.");
+        }
 
         services.AddOptions<JwtSettings>()
                         .Bind(configuration.GetSection(JwtSettings.Section))

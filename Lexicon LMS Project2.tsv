@@ -1,0 +1,104 @@
+Title	URL	Assignees	Status	Linked pull requests	Sub-issues progress	Priority	Size	Estimate	Labels
+Date Validation & Constraints	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/78		Backlog			P1			back-end
+Responsive UI	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/71		Backlog			P0			
+Assignment Submissions	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/75		Backlog			P1			
+Feedback System	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/77		Backlog			P1			
+Notification System	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/80		Backlog			P1			
+Password Reset	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/83		Backlog			P2			
+GDPR & Account Deletion	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/84		Backlog			P2			
+Email Invitations	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/86		Backlog			P2			
+Mobile responsiveness polish	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/99		Backlog						
+Final demo preparation	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/97		Backlog						
+Testing & bug fixes	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/96		Backlog						
+Setup auth middleware	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/102		Backlog						
+Create User entity	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/103		Backlog						
+Create Enrollment Entity	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/119		Backlog						
+Create Feedback Entity	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/121		Backlog						
+Create Notification Entity	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/122		Backlog						
+Testing & Verification	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/128		Backlog						
+Create Blazor Components	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/132		Backlog						
+Design & Styling	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/133		Backlog						
+Create Blazor Components	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/134		Backlog						
+Design & Styling	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/135		Backlog						
+Testing & Validation	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/139		Backlog						
+Add Authentication & Authorization	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/141		Backlog						
+Integration with Navigation	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/142		Backlog						
+Testing & Validation	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/143		Backlog						
+Documentation & Code Quality	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/144		Backlog						
+Mobile Responsiveness	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/145		Backlog						
+Integration Testing	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/146		Backlog						
+Deployment & Final Checks	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/147		Backlog						
+Documentation & Code Review	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/148		Backlog						
+Final Testing & Sign-Off	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/149		Backlog						
+Verify API Endpoints Available	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/159		Backlog						
+Create Frontend User Service	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/160		Backlog						
+Create Blazor Components	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/161		Backlog						
+Design & Styling	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/162		Backlog						
+Mobile Responsiveness	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/163		Backlog						
+Testing & Validation	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/164		Backlog						
+Code Quality & Documentation	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/165		Backlog						
+Integration & Final Testing	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/166		Backlog						
+Add Document to Module	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/179		Backlog						
+Add Document to Activity	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/180		Backlog						
+Create Document	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/182		Backlog						
+Get Document (Id?)	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/183		Backlog						
+Get attached Documents	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/184		Backlog						
+Get attached Documents	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/185		Backlog						
+Get Activities	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/186		Backlog						
+Add Activity to Module	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/187		Backlog						
+Update Document (FileName, DisplayName, Description)	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/188		Backlog						
+Delete Document	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/189		Backlog						
+Create Submission	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/191		Backlog						
+Get Submission	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/192		Backlog						
+Delete Submission	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/193		Backlog						
+Update Submission details (StudentId?, ActivityId?, Body, SubmittedAt, IsLate, FeedbackText, FeedbackGivenAt)	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/194		Backlog						
+Add Module	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/199		Backlog						
+Get Modules	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/200		Backlog						
+Delete Module (from Course)	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/201		Backlog						
+Attach Document	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/202		Backlog						
+Delete Document (from Course)	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/203		Backlog						
+Delete Activity (from Module)	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/204		Backlog						
+Delete Document (from Module)	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/205		Backlog						
+Delete Document from Activity	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/206		Backlog						
+Add Student to Course	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/207		Backlog						
+Add Teacher to Course	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/208		Backlog						
+Add/Remove Submission?	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/209		Backlog						
+Database Setup & Entity Framework sprint2	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/213		Backlog		0 / 4 (0%)				
+Admin-roll	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/224		Backlog						
+Create Paged Dto baseclass	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/225		Sprintlog						back-end
+Module Schedule (Student)	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/66		Sprintlog			P0			back-end, front-end
+Document Management	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/73	kalleloko	Sprintlog			P1			back-end
+Module Schedule (Teacher)	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/226		Sprintlog						back-end, front-end
+Navigation & Routing	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/72	amjadnatouf	In progress			P0			front-end
+Course Schedule (Module View)	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/65	louai20	In progress			P0			back-end, front-end
+Submission Service DB Connection	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/190	kalleloko	In progress		0 / 5 (0%)				back-end
+Course Service DB Connection	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/195	kalleloko	In progress		3 / 10 (30%)				back-end
+REST API Foundation	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/70	louai20	In progress		4 / 9 (44%)	P0			back-end
+Student Course View	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/64	Polyakovleo	In progress		1 / 8 (12%)	P0			back-end, front-end
+User Management	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/68	Bullhoff	In progress		0 / 8 (0%)	P0			front-end
+Activity Service DB Connection	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/169	FelixHavlind	In progress		6 / 10 (60%)				back-end
+Create API Endpoints (Backend)	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/130	Polyakovleo	Done						
+Course Administration Interface	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/67	amjadnatouf	Done		8 / 8 (100%)	P0			
+Database Setup & Entity Framework	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/69	kalleloko	Done		14 / 14 (100%)	P0			
+Document Service DB Connection	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/181	FelixHavlind	Done		0 / 4 (0%)				
+Module Service DB Connection	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/174	kalleloko	Done		4 / 4 (100%)				
+Create Seed Data	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/127	kalleloko	Done						
+Setup Blazor project & dependencies	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/74		Done						
+Login page displays email and password fields	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/105		Done						
+Password is encrypted using a secure hashing algorithm (bcrypt/Argon2)	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/106		Done						
+Login validates credentials against database	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/107		Done						
+User Authentication & Registration	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/63	FelixHavlind	Done		7 / 7 (100%)	P0			
+Authentication token/session created on successful login	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/108		Done						
+Failed login attempts show error message	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/109		Done						
+Users cannot access protected pages without authentication	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/110		Done						
+Logout clears session/token	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/111		Done						
+Create Project Structure & Setup	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/112		Done			P0			
+Create Enum Classes	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/113		Done						
+Create User Entity	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/114		Done						
+Create Course Entity	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/115		Done						
+Create Module Entity	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/116		Done						
+Create Activity Entity	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/117		Done						
+Create Document Entity	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/118		Done						
+Create Submission Entity	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/120		Done						
+Configure Relationships in DbContext	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/123		Done						
+Create Database Indexes	https://github.com/Lexicon-LMS-Grupp4/LMS/issues/124		Done						
