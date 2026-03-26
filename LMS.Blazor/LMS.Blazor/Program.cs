@@ -7,7 +7,6 @@ using LMS.Blazor.Services;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using System.Net.Http.Headers;
-using BlazorBlueprint.Components;
 
 namespace LMS.Blazor;
 
@@ -23,8 +22,6 @@ public class Program
         builder.Services.AddRazorComponents()
             .AddInteractiveWebAssemblyComponents()
             .AddAuthenticationStateSerialization();
-
-        builder.Services.AddBlazorBlueprintComponents();
 
         builder.Services.AddControllers();
 
