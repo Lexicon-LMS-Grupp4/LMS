@@ -1,0 +1,161 @@
+﻿@using LMS.Shared.DTOs.Course
+@using System.ComponentModel.DataAnnotations
+@inject ICourseService CourseService
+
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0">@(isEditMode ? "Edit Course" : "Create Course")</h5>
+    </div>
+    <div class="card-body">
+
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <div class="alert alert-danger alert-dismissible">
+                @errorMessage
+                <button type="button" class="btn-close" @onclick="() => errorMessage = null"></button>
+            </div>
+        }
+
+        <EditForm Model="model" OnValidSubmit="HandleValidSubmitAsync">
+            <DataAnnotationsValidator />
+
+            @* ---- Name ---- *@
+            <div class="mb-3">
+                <label class="form-label fw-semibold">Name <span class="text-danger">*</span></label>
+                <InputText class="form-control" @bind-Value="model.Name" placeholder="Course name" />
+                <ValidationMessage For="() => model.Name" class="text-danger small" />
+            </div>
+
+            @* ---- Description ---- *@
+            <div class="mb-3">
+                <label class="form-label fw-semibold">Description</label>
+                <InputTextArea class="form-control" @bind-Value="model.Description"
+                               placeholder="Course description" rows="3" />
+                <ValidationMessage For="() => model.Description" class="text-danger small" />
+            </div>
+
+            @* ---- Start Date ---- *@
+            <div class="mb-3">
+                <label class="form-label fw-semibold">Start Date <span class="text-danger">*</span></label>
+                <InputDate class="form-control" @bind-Value="model.StartDate" />
+                <ValidationMessage For="() => model.StartDate" class="text-danger small" />
+            </div>
+
+            @* ---- Actions ---- *@
+            <div class="d-flex gap-2 mt-4">
+                <button type="submit" class="btn btn-primary" disabled="@isSubmitting">
+                    @if (isSubmitting)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1"></span>
+                    }
+                    @(isEditMode ? "Update Course" : "Save Course")
+                </button>
+                <button type="button" class="btn btn-secondary"
+                        @onclick="OnCancel" disabled="@isSubmitting">
+                    Cancel
+                </button>
+            </div>
+
+        </EditForm>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public CourseDto? Course { get; set; }
+
+    [Parameter, EditorRequired]
+    public EventCallback<CourseDto> OnSubmit { get; set; }
+
+    [Parameter, EditorRequired]
+    public EventCallback OnCancel { get; set; }
+
+    private CourseFormModel model = new();
+    private bool isEditMode;
+    private bool isSubmitting;
+    private string? errorMessage;
+
+    protected override void OnParametersSet()
+    {
+        isEditMode = Course is not null;
+
+        model = isEditMode
+            ? new CourseFormModel
+            {
+                Name = Course!.Name,
+                Description = Course.Description,
+                StartDate = Course.StartDate
+            }
+            : new CourseFormModel();
+    }
+
+    private async Task HandleValidSubmitAsync()
+    {
+        isSubmitting = true;
+        errorMessage = null;
+
+        try
+        {
+            if (isEditMode)
+            {
+                var updateDto = new UpdateCourseDto
+                {
+                    Name = model.Name,
+                    Description = model.Description,
+                    StartDate = model.StartDate
+                };
+                await CourseService.UpdateCourseAsync(Course!.Id, updateDto);
+                await OnSubmit.InvokeAsync(Course! with
+                {
+                    Name = model.Name,
+                    Description = model.Description,
+                    StartDate = model.StartDate
+                });
+            }
+            else
+            {
+                var createDto = new CreateCourseDto
+                {
+                    Name = model.Name,
+                    Description = model.Description,
+                    StartDate = model.StartDate
+                };
+                var result = await CourseService.CreateCourseAsync(createDto);
+                if (result is not null)
+                    await OnSubmit.InvokeAsync(result);
+                else
+                    errorMessage = "Failed to create course. Please try again.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"An error occurred: {ex.Message}";
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+    // ---- Internal form model with validation attributes ----
+    private class CourseFormModel
+    {
+        [Required(ErrorMessage = "Name is required.")]
+        [MaxLength(200, ErrorMessage = "Name cannot exceed 200 characters.")]
+        public string Name { get; set; } = string.Empty;
+
+        [MaxLength(2000, ErrorMessage = "Description cannot exceed 2000 characters.")]
+        public string Description { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Start date is required.")]
+        [FutureDate(ErrorMessage = "Start date cannot be in the past.")]
+        public DateTime StartDate { get; set; } = DateTime.Today;
+    }
+
+    // ---- Custom validator for future date ----
+    private class FutureDateAttribute : ValidationAttribute
+    {
+        public override bool IsValid(object? value)
+            => value is DateTime date && date.Date >= DateTime.Today;
+    }
+}

@@ -1,77 +1,158 @@
 ﻿@implements IDisposable
-
 @inject NavigationManager NavigationManager
+@using Microsoft.AspNetCore.Components.Authorization
 
 <div class="top-row ps-3 navbar navbar-dark">
     <div class="container-fluid">
-        <a class="navbar-brand" href="">LMS.Blazor</a>
+        <a class="navbar-brand" href="/">
+            <span class="brand-title">Lexicon LMS</span>
+            <span class="brand-subtitle">Learning Platform</span>
+        </a>
     </div>
 </div>
 
 <input type="checkbox" title="Navigation menu" class="navbar-toggler" />
 
-<div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
-    <nav class="nav flex-column">
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Home
-            </NavLink>
-        </div>
-
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="counter">
-                <span class="bi bi-plus-square-fill-nav-menu" aria-hidden="true"></span> Counter
-            </NavLink>
-        </div>
-
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="weather">
-                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Weather
-            </NavLink>
-        </div>
-
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="auth">
-                <span class="bi bi-lock-nav-menu" aria-hidden="true"></span> Auth Required
-            </NavLink>
-        </div>
-
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="demoauth">
-                <span class="bi bi-shield-lock-nav-menu" aria-hidden="true"></span> Demo Auth
-            </NavLink>
-        </div>
+<div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler')?.click()">
+    <nav class="flex-column">
 
         <AuthorizeView>
-            <Authorized>
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="Account/Manage">
-                        <span class="bi bi-person-fill-nav-menu" aria-hidden="true"></span> @context.User.Identity?.Name
-                    </NavLink>
-                </div>
-                <div class="nav-item px-3">
-                    <form action="Account/Logout" method="post">
-                        <AntiforgeryToken />
-                        <input type="hidden" name="ReturnUrl" value="@currentUrl" />
-                        <button type="submit" class="nav-link">
-                            <span class="bi bi-arrow-bar-left-nav-menu" aria-hidden="true"></span> Logout
-                        </button>
-                    </form>
-                </div>
-            </Authorized>
             <NotAuthorized>
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="Account/Register">
-                        <span class="bi bi-person-nav-menu" aria-hidden="true"></span> Register
-                    </NavLink>
-                </div>
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="Account/Login">
-                        <span class="bi bi-person-badge-nav-menu" aria-hidden="true"></span> Login
-                    </NavLink>
+                <div class="nav-section">
+                    <div class="nav-section-title">Account</div>
+
+                    <div class="nav-item">
+                        <NavLink class="nav-link" href="/Account/Login">
+                            <span class="bi bi-box-arrow-in-right-nav-menu" aria-hidden="true"></span>
+                            Login
+                        </NavLink>
+                    </div>
+
+                    <div class="nav-item">
+                        <NavLink class="nav-link" href="/Account/Register">
+                            <span class="bi bi-person-plus-nav-menu" aria-hidden="true"></span>
+                            Register
+                        </NavLink>
+                    </div>
                 </div>
             </NotAuthorized>
         </AuthorizeView>
+
+        <AuthorizeView Roles="Teacher">
+            <Authorized>
+                <div class="nav-section">
+                    <div class="nav-section-title">teacher</div>
+
+                    <div class="nav-item">
+                        <NavLink class="nav-link" href="/admin/courses">
+                            <span class="bi bi-book-nav-menu" aria-hidden="true"></span>
+                            Courses
+                        </NavLink>
+                    </div>
+
+                    @* <div class="nav-item">
+                        <NavLink class="nav-link" href="/admin">
+                            <span class="bi bi-grid-nav-menu" aria-hidden="true"></span>
+                            Dashboard
+                        </NavLink>
+                    </div>
+
+                    <div class="nav-item">
+                        <NavLink class="nav-link" href="/admin/modules">
+                            <span class="bi bi-folder-nav-menu" aria-hidden="true"></span>
+                            Modules
+                        </NavLink>
+                    </div>
+
+                    <div class="nav-item">
+                        <NavLink class="nav-link" href="/admin/activities">
+                            <span class="bi bi-calendar-nav-menu" aria-hidden="true"></span>
+                            Activities
+                        </NavLink>
+                    </div>
+
+                    <div class="nav-item">
+                        <NavLink class="nav-link" href="/admin/documents">
+                            <span class="bi bi-file-earmark-nav-menu" aria-hidden="true"></span>
+                            Documents
+                        </NavLink>
+                    </div> *@
+                    
+                    <div class="nav-item">
+                        <NavLink class="nav-link" href="/admin/students">
+                            <span class="bi bi-people-nav-menu" aria-hidden="true"></span>
+                            Students
+                        </NavLink>
+                    </div>
+                </div>
+
+                <div class="nav-section">
+                    <div class="nav-section-title">Account</div>
+
+                    <div class="nav-item">
+                        <NavLink class="nav-link" href="/Account/Logout">
+                            <span class="bi bi-arrow-bar-left-nav-menu" aria-hidden="true"></span>
+                            Logout
+                        </NavLink>
+                    </div>
+                </div>
+            </Authorized>
+        </AuthorizeView>
+
+        <AuthorizeView Roles="Student">
+            <Authorized>
+                <div class="nav-section">
+                    <div class="nav-section-title">Student</div>
+
+                    <div class="nav-item">
+                        <NavLink class="nav-link" href="/student">
+                            <span class="bi bi-grid-nav-menu" aria-hidden="true"></span>
+                            Dashboard
+                        </NavLink>
+                    </div>
+
+                    <div class="nav-item">
+                        <NavLink class="nav-link" href="/student/courses">
+                            <span class="bi bi-book-nav-menu" aria-hidden="true"></span>
+                            My Courses
+                        </NavLink>
+                    </div>
+
+                    <div class="nav-item">
+                        <NavLink class="nav-link" href="/student/modules">
+                            <span class="bi bi-folder-nav-menu" aria-hidden="true"></span>
+                            My Modules
+                        </NavLink>
+                    </div>
+
+                    <div class="nav-item">
+                        <NavLink class="nav-link" href="/student/activities">
+                            <span class="bi bi-calendar-nav-menu" aria-hidden="true"></span>
+                            My Activities
+                        </NavLink>
+                    </div>
+
+                    <div class="nav-item">
+                        <NavLink class="nav-link" href="/student/documents">
+                            <span class="bi bi-file-earmark-nav-menu" aria-hidden="true"></span>
+                            Documents
+                        </NavLink>
+                    </div>
+                </div>
+
+                <div class="nav-section">
+                    <div class="nav-section-title">Account</div>
+
+                    <div class="nav-item">
+                        <NavLink class="nav-link" href="/Account/Logout">
+                            <span class="bi bi-arrow-bar-left-nav-menu" aria-hidden="true"></span>
+                            Logout
+                        </NavLink>
+                    </div>
+                </div>
+            </Authorized>
+        </AuthorizeView>
+
     </nav>
 </div>
 
@@ -95,4 +176,3 @@
         NavigationManager.LocationChanged -= OnLocationChanged;
     }
 }
-

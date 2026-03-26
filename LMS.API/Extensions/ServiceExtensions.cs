@@ -1,4 +1,4 @@
-﻿using LMS.Infractructure.Data;
+using LMS.Infractructure.Data;
 using LMS.Infractructure.Repositories;
 using LMS.Presentation;
 using LMS.Services;
@@ -90,5 +90,27 @@ public static class ServiceExtensions
 
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped(provider => new Lazy<IAuthService>(() => provider.GetRequiredService<IAuthService>()));
+
+        // Course Service
+        services.AddScoped<ICourseService, CourseService>();
+        services.AddScoped(provider => new Lazy<ICourseService>(() => provider.GetRequiredService<ICourseService>()));
+
+        // Module Service
+        services.AddScoped<IModuleService, ModuleService>();
+        services.AddScoped(provider => new Lazy<IModuleService>(() => provider.GetRequiredService<IModuleService>()));
+
+        // Activity Service
+        services.AddScoped<IActivityService, ActivityService>();
+        services.AddScoped(provider => new Lazy<IActivityService>(() => provider.GetRequiredService<IActivityService>()));
+
+        // Document Service
+        services.AddScoped<IDocumentService, DocumentService>();
+        services.AddScoped(provider => new Lazy<IDocumentService>(() => provider.GetRequiredService<IDocumentService>()));
+
+        // Submission Service
+        services.AddScoped<ISubmissionService, SubmissionService>();
+        services.AddScoped(provider => new Lazy<ISubmissionService>(() => provider.GetRequiredService<ISubmissionService>()));
+
+        services.AddScoped<IStudentCourseService, StudentCourseService>();
     }
 }

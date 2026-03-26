@@ -1,5 +1,4 @@
 using Domain.Models.Entities;
-using LMS.Blazor.Client.Pages;
 using LMS.Blazor.Client.Services;
 using LMS.Blazor.Components;
 using LMS.Blazor.Components.Account;
@@ -16,6 +15,8 @@ public class Program
     public static void Main(string[] args)
     {
         var builder = WebApplication.CreateBuilder(args);
+
+        builder.Configuration.AddJsonFile("appsettings.local.json", optional: true, reloadOnChange: true);
 
         // Add services to the container.
         builder.Services.AddRazorComponents()
@@ -37,15 +38,15 @@ public class Program
         builder.Services.AddAuthorization();
 
         var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
-       
+
         builder.Services.AddDbContext<ApplicationDbContext>(options =>
             options.UseSqlServer(connectionString));
-       
+
         builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 
         builder.Services.AddIdentityCore<ApplicationUser>(options =>
             {
-               // options.SignIn.RequireConfirmedAccount = true;
+                // options.SignIn.RequireConfirmedAccount = true;
                 options.Stores.SchemaVersion = IdentitySchemaVersions.Version3;
             })
             .AddEntityFrameworkStores<ApplicationDbContext>()
@@ -57,7 +58,7 @@ public class Program
 
         builder.Services.AddHttpClient("LmsApiClient", client =>
         {
-            var apiBaseUrl = builder.Configuration["LmsApiBaseUrl"] 
+            var apiBaseUrl = builder.Configuration["LmsApiBaseUrl"]
                 ?? throw new InvalidOperationException("BaseUrl not found");
 
             client.BaseAddress = new Uri(apiBaseUrl);
@@ -69,6 +70,7 @@ public class Program
         builder.Services.AddSingleton<ITokenStorage, TokenStorageService>();
         //  builder.Services.AddScoped<IApiService, ClientApiService>();
         builder.Services.AddScoped<IApiService, ServerNoOpApiService>();
+        builder.Services.AddScoped<ICourseService, ServerNoOpCourseService>();
 
         var app = builder.Build();
 

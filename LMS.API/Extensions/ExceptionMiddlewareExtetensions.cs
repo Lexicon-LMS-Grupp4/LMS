@@ -1,6 +1,5 @@
 ﻿using Domain.Models.Exceptions;
 using Microsoft.AspNetCore.Diagnostics;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Infrastructure;
 
 namespace LMS.API.Extensions;
@@ -21,9 +20,10 @@ public static class ExceptionMiddlewareExtetensions
 
                     var (statusCode, title) = exception switch
                     {
-                        BadRequestException => (StatusCodes.Status400BadRequest, (exception as BadRequestException)!.Title),
-                        NotFoundException => (StatusCodes.Status404NotFound, (exception as NotFoundException)!.Title),
-                        TokenValidationException tokenEx => (tokenEx.StatusCode, "Unauthorized"),
+                        BadRequestException ex => (StatusCodes.Status400BadRequest, ex!.Title),
+                        NotFoundException ex => (StatusCodes.Status404NotFound, ex!.Title),
+                        TokenValidationException ex => (ex.StatusCode, "Unauthorized"),
+                        KeyNotFoundException ex => (StatusCodes.Status404NotFound, "Not Found"),
                         _ => (StatusCodes.Status500InternalServerError, "Internal Server Error")
                     };
 
