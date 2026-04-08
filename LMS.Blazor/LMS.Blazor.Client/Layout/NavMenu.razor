@@ -28,9 +28,6 @@
                         </NavLink>
                     </div>
 
-                    
-
-        
                     <div class="nav-item">
                         <NavLink class="nav-link" href="/Account/Register">
                             <span class="bi bi-person-plus-nav-menu" aria-hidden="true"></span>
@@ -45,58 +42,25 @@
             <Authorized>
                 <div class="nav-section">
                     <div class="nav-section-title">teacher</div>
-
-                    <div class="nav-item">
-                        <NavLink class="nav-link" href="/admin">
-                            <span class="bi bi-grid-nav-menu" aria-hidden="true"></span>
-                            Dashboard
-                        </NavLink>
-                    </div>
-                    
+    
                     <div class="nav-item ">
                         <NavLink class="nav-link" href="/admin/courses">
                             <span class="bi bi-book-nav-menu" aria-hidden="true"></span>
                             Courses
                         </NavLink>
                     </div>
-                    <div class="nav-item ">
-                        <NavLink class="nav-link" href="courses/1">
-                            <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Modules
-                        </NavLink>
-                    </div>
-
-                    <div class="nav-item">
-                        <NavLink class="nav-link" href="/admin/modules">
-                            <span class="bi bi-folder-nav-menu" aria-hidden="true"></span>
-                            Modules
-                        </NavLink>
-                    </div>
-
-                    <div class="nav-item ">
-                        <NavLink class="nav-link" href="/admin/activities">
-                            <span class="bi bi-calendar-nav-menu" aria-hidden="true"></span>
-                            Activities
-                        </NavLink>
-                    </div>
-
-                    <div class="nav-item ">
-                        <NavLink class="nav-link" href="/admin/documents">
-                            <span class="bi bi-file-earmark-nav-menu" aria-hidden="true"></span>
-                            Documents
-                        </NavLink>
-                    </div>
                     
-                    <div class="nav-item ">
-                        <NavLink class="nav-link" href="/admin/students">
-                            <span class="bi bi-people-nav-menu" aria-hidden="true"></span>
-                            Students
-                        </NavLink>
-                    </div>
-
                     <div class="nav-item ">
                         <NavLink class="nav-link" href="/admin/users">
                             <span class="bi bi-people-nav-menu" aria-hidden="true"></span>
                             Users
+                        </NavLink>
+                    </div>
+
+                    <div class="nav-item ">
+                        <NavLink class="nav-link" href="/admin/submissions">
+                            <span class="bi bi-book-nav-menu" aria-hidden="true"></span>
+                            Submissions
                         </NavLink>
                     </div>
                 </div>
@@ -130,7 +94,7 @@
                     <div class="nav-section-title">Student</div>
 
                     <div class="nav-item ">
-                                    <NavLink class="nav-link" href="/student/dashboard">
+                            <NavLink class="nav-link" href="/student/dashboard">
                             <span class="bi bi-grid-nav-menu" aria-hidden="true"></span>
                             Dashboard
                         </NavLink>
@@ -139,21 +103,19 @@
                     <div class="nav-item ">
                         <NavLink class="nav-link" href="/courses/1">
                             <span class="bi bi-folder-nav-menu" aria-hidden="true"></span>
-                            My Course
+                            Modules @*Should be dynamically changed and set to the Course.Name of the course the student is enrolled in*@
                         </NavLink>
                     </div>
-
-                    <div class="nav-item ">
-                        <NavLink class="nav-link" href="/student/activities">
-                            <span class="bi bi-calendar-nav-menu" aria-hidden="true"></span>
-                            My Activities
+                    <div class="nav-item">
+                        <NavLink class="nav-link" href="/submissions">
+                            <span class="bi bi-folder-nav-menu" aria-hidden="true"></span>
+                            Submissions
                         </NavLink>
                     </div>
-
-                    <div class="nav-item ">
-                        <NavLink class="nav-link" href="/student/documents">
-                            <span class="bi bi-file-earmark-nav-menu" aria-hidden="true"></span>
-                            Documents
+                    <div class="nav-item">
+                        <NavLink class="nav-link" href="/students">
+                            <span class="bi bi-folder-nav-menu" aria-hidden="true"></span>
+                            Students
                         </NavLink>
                     </div>
                 </div>
