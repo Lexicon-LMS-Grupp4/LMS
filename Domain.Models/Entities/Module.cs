@@ -1,4 +1,4 @@
-﻿namespace Domain.Models.Entities;
+namespace Domain.Models.Entities;
 
 public class Module : EntityBase
 {
@@ -8,6 +8,7 @@ public class Module : EntityBase
     public string Description { get; set; } = string.Empty;
     public DateTime StartDate { get; set; }
     public DateTime EndDate { get; set; }
+    public string? Icon { get; set; }
     public ICollection<Activity> Activities { get; set; } = [];
     public ICollection<Document> Documents { get; set; } = [];
 }

@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace LMS.Shared.DTOs.Document
+﻿namespace LMS.Shared.DTOs.Document
 {
     /// <summary>
     /// Represents a document attached to a course, module, or activity.
@@ -8,31 +6,35 @@ namespace LMS.Shared.DTOs.Document
     /// </summary>
     public record DocumentDto
     {
-        public required int Id { get; set; }
-        public required string FileName { get; set; }
-        public required string DisplayName { get; set; }
-        public required string Description { get; set; }
+        public required int Id { get; init; }
+        /// <summary>
+        /// Gets or sets the URL endpoint of the associated file.
+        /// </summary>
+        public string? FileUrl { get; init; }
+        public long FileSize { get; init; }
+        public required string DisplayName { get; init; }
+        public required string Description { get; init; }
 
         /// <summary>
         /// Date and time when the document was uploaded.
         /// </summary>
-        public required DateTime UploadedAt { get; set; }
+        public required DateTime UploadedAt { get; init; }
 
         /// <summary>
         /// User ID of the person who uploaded the document.
         /// References APPLICATIONUSER.Id.
         /// </summary>
-        public required string UploadedByUserId { get; set; }
+        public required string UploadedByUserId { get; init; }
 
         /// <summary>
         /// Name of the user who uploaded the document.
         /// Populated by joining with APPLICATIONUSER table.
         /// </summary>
-        public required string UploadedByUserName { get; set; }
-        public int? CourseId { get; set; }
-        public int? ModuleId { get; set; }
-        public int? ActivityId { get; set; }
-        public int? SubmissionId { get; set; }
-        public required string Scope { get; set; }
+        public required string UploadedByUserName { get; init; }
+        public int? CourseId { get; init; }
+        public int? ModuleId { get; init; }
+        public int? ActivityId { get; init; }
+        public int? SubmissionId { get; init; }
+        public required string Scope { get; init; }
     }
 }

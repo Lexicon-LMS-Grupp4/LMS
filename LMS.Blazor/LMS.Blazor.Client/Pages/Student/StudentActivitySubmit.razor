@@ -1,0 +1,502 @@
+﻿@page "/student/activities/{ActivityId:int}/submit"
+@attribute [Authorize(Roles = "Student")]
+@using LMS.Shared.DTOs.Activity
+@using LMS.Shared.DTOs.Document
+@using LMS.Shared.DTOs.Submission
+@using Domain.Models.Enums
+@inject IActivityService ActivityService
+@inject NavigationManager Navigation
+
+<PageTitle>Submit Activity</PageTitle>
+
+<div class="container py-4" style="max-width:860px;">
+
+    @* ---- Header ---- *@
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+        <h2 class="mb-0">Submit Activity</h2>
+        <button class="btn btn-outline-secondary" @onclick="GoBack">
+            <i class="bi bi-arrow-left"></i>
+            <span class="d-none d-md-inline ms-1">Back to Dashboard</span>
+        </button>
+    </div>
+
+    @* ---- Feedback ---- *@
+    @if (!string.IsNullOrEmpty(successMessage))
+    {
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            <i class="bi bi-check-circle me-2"></i>@successMessage
+            <button type="button" class="btn-close" @onclick="() => successMessage = null"></button>
+        </div>
+    }
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            @errorMessage
+            <button type="button" class="btn-close" @onclick="() => errorMessage = null"></button>
+        </div>
+    }
+
+    @* ---- Loading ---- *@
+    @if (isLoading)
+    {
+        <div class="text-center py-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2 text-muted">Loading activity...</p>
+        </div>
+    }
+    else if (!string.IsNullOrEmpty(loadError))
+    {
+        <div class="alert alert-danger">
+            <p>@loadError</p>
+            <button class="btn btn-outline-danger btn-sm" @onclick="LoadActivityAsync">Retry</button>
+        </div>
+    }
+    else if (activity is null)
+    {
+        <div class="alert alert-warning">Activity not found.</div>
+    }
+    else
+    {
+        @* ==============================
+           ACTIVITY INFO CARD
+           ============================== *@
+        <div class="card mb-4">
+            <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+                <div>
+                    <span class="badge @GetActivityTypeBadge(activity.Type) me-2">@activity.Type</span>
+                    <span class="fw-semibold">@activity.ModuleName</span>
+                </div>
+                @if (isOverdue)
+                {
+                    <span class="badge bg-danger">
+                        <i class="bi bi-exclamation-triangle me-1"></i>Deadline Passed
+                    </span>
+                }
+                else
+                {
+                    <span class="badge bg-success">
+                        <i class="bi bi-clock me-1"></i>Open
+                    </span>
+                }
+            </div>
+            <div class="card-body">
+                <h4 class="fw-bold mb-2">@activity.Name</h4>
+                @if (!string.IsNullOrEmpty(activity.Description))
+                {
+                    <p class="text-muted mb-3">@activity.Description</p>
+                }
+
+                <div class="row g-2 small">
+                    <div class="col-6 col-md-3">
+                        <span class="text-muted d-block">Opens</span>
+                        <span>@activity.StartTime.ToString("MMM d, yyyy HH:mm")</span>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <span class="text-muted d-block">Deadline</span>
+                        <span class="@(isOverdue ? "text-danger fw-semibold" : "")">
+                            @activity.EndTime.ToString("MMM d, yyyy HH:mm")
+                        </span>
+                    </div>
+                    @if (!isOverdue)
+                    {
+                        <div class="col-12 col-md-6">
+                            <span class="text-muted d-block">Time Remaining</span>
+                            <span class="@(timeRemaining.TotalHours < 24 ? "text-warning fw-semibold" : "text-success")">
+                                @FormatTimeRemaining(timeRemaining)
+                            </span>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        @* ==============================
+           ACTIVITY DOCUMENTS
+           ============================== *@
+        @if (activity.DocumentCount > 0)
+        {
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="bi bi-file-earmark-text me-2"></i>Activity Materials</h6>
+                </div>
+                <div class="card-body p-0">
+                    @if (!activityDocuments.Any())
+                    {
+                        <p class="text-muted p-3 mb-0">
+                            <span class="spinner-border spinner-border-sm me-2"></span>
+                            Loading materials...
+                        </p>
+                    }
+                    else
+                    {
+                        <ul class="list-group list-group-flush">
+                            @foreach (var doc in activityDocuments)
+                            {
+                                <li class="list-group-item px-3 py-2">
+                                    <div class="d-flex align-items-center gap-3">
+                                        <i class="bi bi-file-earmark-text fs-4 text-muted flex-shrink-0"></i>
+                                        <div class="overflow-hidden">
+                                            <div class="fw-semibold small text-truncate">@doc.DisplayName</div>
+                                        </div>
+                                    </div>
+                                </li>
+                            }
+                        </ul>
+                    }
+                </div>
+            </div>
+        }
+
+        @* ==============================
+           EXISTING SUBMISSION (if any)
+           ============================== *@
+        @if (existingSubmission is not null)
+        {
+            <div class="card mb-4 border-success">
+                <div class="card-header bg-success bg-opacity-10 d-flex flex-wrap justify-content-between align-items-center gap-2">
+                    <h6 class="mb-0 text-success">
+                        <i class="bi bi-check-circle me-2"></i>Already Submitted
+                    </h6>
+                    <div class="d-flex gap-2 flex-wrap">
+                        @if (existingSubmission.IsLate)
+                        {
+                            <span class="badge bg-danger">Late</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-success">On time</span>
+                        }
+                        <span class="text-muted small">
+                            @existingSubmission.SubmittedAt.ToString("MMM d, yyyy HH:mm")
+                        </span>
+                    </div>
+                </div>
+                <div class="card-body">
+                    @if (!string.IsNullOrEmpty(existingSubmission.Body))
+                    {
+                        <p class="small fw-semibold text-muted mb-1">Your answer</p>
+                        <div class="border rounded p-3 bg-light small" style="white-space:pre-wrap;">
+                            @existingSubmission.Body
+                        </div>
+                    }
+                    else if (existingSubmission.Document is not null)
+                    {
+                        <p class="small fw-semibold text-muted mb-1">Attached file</p>
+                        <div class="d-flex align-items-center gap-2 border rounded p-2 bg-light">
+                            <i class="bi bi-file-earmark-text fs-4 text-muted"></i>
+                            <div>
+                                <div class="fw-semibold small">@existingSubmission.Document.DisplayName</div>
+                            </div>
+                        </div>
+                    }
+
+                    @* ---- Feedback block ---- *@
+                    @* TODO: implement new submission comments *@
+                    @* @if (existingSubmission.FeedbackText is not null)
+                    {
+                        <hr />
+                        <p class="small fw-semibold text-muted mb-1">
+                            <i class="bi bi-chat-left-text me-1"></i>Teacher Feedback
+                            <span class="text-muted fw-normal ms-2">
+                                (@existingSubmission.FeedbackGivenAt?.ToString("MMM d, yyyy"))
+                            </span>
+                        </p>
+                        <div class="border rounded p-3 bg-white small" style="white-space:pre-wrap;">
+                            @existingSubmission.FeedbackText
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="text-muted small mt-3 mb-0">
+                            <i class="bi bi-hourglass-split me-1"></i>Feedback not yet given.
+                        </p>
+                    } *@
+
+                    @* ---- Re-submit option (only if deadline not passed) ---- *@
+                    @if (!isOverdue)
+                    {
+                        <div class="mt-3">
+                            <button class="btn btn-sm btn-outline-primary"
+                                    @onclick="() => showResubmitForm = !showResubmitForm">
+                                <i class="bi bi-pencil me-1"></i>
+                                @(showResubmitForm ? "Cancel Edit" : "Edit Submission")
+                            </button>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+
+        @* ==============================
+           SUBMISSION FORM
+           ============================== *@
+        @if (existingSubmission is null || showResubmitForm)
+        {
+            <div class="card mb-4 @(isOverdue ? "border-danger border-opacity-25" : "")">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0">
+                        <i class="bi bi-send me-2"></i>
+                        @(existingSubmission is null ? "Your Submission" : "Edit Submission")
+                    </h6>
+                    @if (isOverdue)
+                    {
+                        <span class="badge bg-danger">Late submission</span>
+                    }
+                </div>
+                <div class="card-body">
+
+                    @* ---- Tab switcher: text vs file ---- *@
+                    <ul class="nav nav-tabs mb-3">
+                        <li class="nav-item">
+                            <button class="nav-link @(submissionTab == SubmissionTab.Text ? "active" : "")"
+                                    @onclick="() => submissionTab = SubmissionTab.Text">
+                                <i class="bi bi-textarea-t me-1"></i>Text Answer
+                            </button>
+                        </li>
+                        <li class="nav-item">
+                            <button class="nav-link @(submissionTab == SubmissionTab.File ? "active" : "")"
+                                    @onclick="() => submissionTab = SubmissionTab.File">
+                                <i class="bi bi-file-earmark-arrow-up me-1"></i>File Upload
+                            </button>
+                        </li>
+                    </ul>
+
+                    @if (submissionTab == SubmissionTab.Text)
+                    {
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">
+                                Your Answer
+                                @if (!isOverdue)
+                                {
+                                    <span class="text-danger">*</span>
+                                }
+                            </label>
+                            <textarea class="form-control @(formErrors.ContainsKey("Body") ? "is-invalid" : "")"
+                                      rows="8"
+                                      placeholder="Write your answer here..."
+                                      @bind="submissionBody"
+                                          disabled="@isOverdue">
+                            </textarea>
+                                @if (formErrors.TryGetValue("Body", out var bodyErr))
+                                {
+                                    <div class="invalid-feedback">@bodyErr</div>
+                                }
+                                <div class="form-text">
+                                    @submissionBody.Length characters
+                                </div>
+                            </div>
+                        }
+                    else
+                        {
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">Attach File</label>
+                                <div class="border rounded p-4 text-center bg-light @(formErrors.ContainsKey("File") ? "border-danger" : "")">
+                                    <i class="bi bi-cloud-upload fs-2 text-muted d-block mb-2"></i>
+                                    <p class="text-muted small mb-2">
+                                        File upload requires document storage backend — not yet available.
+                                    </p>
+                                    <input type="file"
+                                           class="form-control form-control-sm"
+                                           disabled
+                                           @onchange="HandleFilePicked" />
+                                </div>
+                                @if (formErrors.TryGetValue("File", out var fileErr))
+                                {
+                                    <div class="text-danger small mt-1">@fileErr</div>
+                                }
+                            </div>
+                        }
+
+                        @* ---- Submit button ---- *@
+                        <div class="d-flex gap-2 flex-wrap align-items-center">
+                            <button class="btn @(isOverdue ? "btn-warning" : "btn-primary")"
+                                    @onclick="SubmitAsync"
+                                    disabled="@(isSubmitting || isOverdue)">
+                                @if (isSubmitting)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-1"></span>
+                                }
+                                else
+                                {
+                                    <i class="bi bi-send me-1"></i>
+                                }
+                                @(existingSubmission is null ? "Submit" : "Update Submission")
+                            </button>
+
+                            @if (existingSubmission is not null)
+                            {
+                                <button class="btn btn-outline-secondary"
+                                        @onclick="() => showResubmitForm = false">
+                                    Cancel
+                                </button>
+                            }
+
+                            @if (isOverdue)
+                            {
+                                <span class="text-danger small">
+                                    <i class="bi bi-lock me-1"></i>Submission closed — deadline has passed.
+                                </span>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+        }
+    </div>
+
+@code {
+    [Parameter] public int ActivityId { get; set; }
+
+    // ---- Data ----
+    private ActivityDto? activity;
+    private List<DocumentDto> activityDocuments = [];
+    private SubmissionDto? existingSubmission;
+
+    // ---- Page state ----
+    private bool isLoading;
+    private string? loadError;
+    private string? successMessage;
+    private string? errorMessage;
+
+    // ---- Deadline helpers ----
+    private bool isOverdue => activity is not null && activity.EndTime < DateTime.Now;
+    private TimeSpan timeRemaining => activity is not null
+        ? activity.EndTime - DateTime.Now
+        : TimeSpan.Zero;
+
+    // ---- Form state ----
+    private string submissionBody = string.Empty;
+    private SubmissionTab submissionTab = SubmissionTab.Text;
+    private bool isSubmitting;
+    private bool showResubmitForm;
+    private Dictionary<string, string> formErrors = new();
+
+    // ---- Lifecycle ----
+    protected override async Task OnInitializedAsync()
+        => await LoadActivityAsync();
+
+    private async Task LoadActivityAsync()
+    {
+        isLoading = true;
+        loadError = null;
+        StateHasChanged();
+
+        try
+        {
+            activity = await ActivityService.GetActivityByIdAsync(ActivityId);
+
+            // TODO: once ISubmissionService is added to client, load existing submission:
+            // existingSubmission = await SubmissionService.GetMySubmissionForActivityAsync(ActivityId);
+            // For now, existingSubmission stays null.
+
+            // TODO: load activityDocuments once detail endpoint is wired:
+            // var detail = await ActivityService.GetActivityDetailByIdAsync(ActivityId);
+            // activityDocuments = detail?.Documents ?? [];
+        }
+        catch (Exception ex)
+        {
+            loadError = $"Failed to load activity. {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    // ---- Submit ----
+    private async Task SubmitAsync()
+    {
+        formErrors = ValidateForm();
+        if (formErrors.Any()) return;
+
+        isSubmitting = true;
+        try
+        {
+            if (existingSubmission is null)
+            {
+                // TODO: replace with real call once ISubmissionService is on the client:
+                // var dto = new CreateSubmissionDto
+                // {
+                //     StudentId  = currentUserId,   // from auth state
+                //     ActivityId = ActivityId,
+                //     Body       = submissionTab == SubmissionTab.Text ? submissionBody : null
+                // };
+                // existingSubmission = await SubmissionService.CreateSubmissionAsync(dto);
+
+                // Optimistic local stand-in
+                existingSubmission = new SubmissionDto
+                {
+                    Id = 0,
+                    StudentId = "current-user",
+                    StudentName = "You",
+                    ActivityId = ActivityId,
+                    ActivityName = activity!.Name,
+                    Body = submissionTab == SubmissionTab.Text ? submissionBody : null,
+                    SubmittedAt = DateTime.Now,
+                    IsLate = isOverdue
+                };
+
+                successMessage = "Your submission has been recorded! 🎉";
+            }
+            else
+            {
+                // TODO: call UpdateSubmissionAsync once wired
+                existingSubmission = existingSubmission with
+                {
+                    Body = submissionTab == SubmissionTab.Text ? submissionBody : existingSubmission.Body,
+                    SubmittedAt = DateTime.Now
+                };
+                successMessage = "Your submission has been updated.";
+            }
+
+            showResubmitForm = false;
+            submissionBody = string.Empty;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to submit. {ex.Message}";
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+    // ---- Validation ----
+    private Dictionary<string, string> ValidateForm()
+    {
+        var errors = new Dictionary<string, string>();
+
+        if (submissionTab == SubmissionTab.Text && string.IsNullOrWhiteSpace(submissionBody))
+            errors["Body"] = "Please write something before submitting.";
+
+        return errors;
+    }
+
+    // ---- Helpers ----
+    private void HandleFilePicked(ChangeEventArgs e) { /* file upload not yet supported */ }
+
+    private void GoBack() => Navigation.NavigateTo("/student/dashboard");
+
+    private static string FormatTimeRemaining(TimeSpan t)
+    {
+        if (t.TotalDays >= 1)
+            return $"{(int)t.TotalDays}d {t.Hours}h remaining";
+        if (t.TotalHours >= 1)
+            return $"{(int)t.TotalHours}h {t.Minutes}m remaining";
+        return $"{t.Minutes}m remaining";
+    }
+
+    private static string GetActivityTypeBadge(ActivityType type) => type switch
+    {
+        ActivityType.Assignment => "bg-warning text-dark",
+        ActivityType.Exercise => "bg-danger",
+        ActivityType.Lecture => "bg-primary",
+        ActivityType.ELearning => "bg-success",
+        _ => "bg-secondary"
+    };
+
+    private enum SubmissionTab { Text, File }
+}

@@ -1,11 +1,8 @@
 namespace LMS.Shared.DTOs.User;
 
-public record UserDto
+public record UserDto : UserBasicDto
 {
-    public required string Id { get; set; }
-    public required string Name { get; set; }
-    public required string Email { get; set; }
-    public required string Role { get; set; }
-    public int? CourseId { get; set; }
-    public string? CourseName { get; set; }
+    public required string Role { get; init; }
+    public int? CourseId { get; init; }
+    public string? CourseName { get; init; }
 }

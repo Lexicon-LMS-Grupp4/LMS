@@ -1,6 +1,7 @@
 ﻿using AutoMapper;
 using Domain.Contracts.Repositories;
 using Domain.Models.Entities;
+using Domain.Models.Exceptions;
 using LMS.Shared.DTOs.Common;
 using LMS.Shared.DTOs.Course;
 using Service.Contracts;
@@ -31,16 +32,19 @@ public class CourseService : ICourseService
         };
     }
 
-    public async Task<CourseDto?> GetCourseByIdAsync(int id)
+    public async Task<CourseDto> GetCourseByIdAsync(int id)
     {
-        var course = await unitOfWork.Courses.GetCourseAsync(id, trackChanges: false);
-        return course is null ? null : mapper.Map<CourseDto>(course);
+        var course = await unitOfWork.Courses.GetCourseAsync(id)
+            ?? throw new NotFoundException($"Course with id {id} not found");
+        return mapper.Map<CourseDto>(course);
     }
 
-    public async Task<CourseDetailDto?> GetCourseDetailByIdAsync(int id)
+
+    public async Task<CourseDetailDto> GetCourseDetailByIdAsync(int id)
     {
-        var course = await unitOfWork.Courses.GetCourseAsync(id, trackChanges: false);
-        return course is null ? null : mapper.Map<CourseDetailDto>(course);
+        var course = await unitOfWork.Courses.GetCourseAsync(id)
+            ?? throw new NotFoundException($"Course with id {id} not found");
+        return mapper.Map<CourseDetailDto>(course);
     }
 
     public async Task<CourseDto> CreateCourseAsync(CreateCourseDto dto)
@@ -58,9 +62,8 @@ public class CourseService : ICourseService
     {
         ArgumentNullException.ThrowIfNull(dto);
 
-        var course = await unitOfWork.Courses.GetCourseAsync(id, trackChanges: true);
-        if (course is null)
-            throw new KeyNotFoundException($"Course with id {id} was not found.");
+        var course = await unitOfWork.Courses.GetCourseAsync(id, trackChanges: true)
+            ?? throw new NotFoundException($"Course with id {id} was not found.");
 
         mapper.Map(dto, course);
         await unitOfWork.CompleteAsync();
@@ -68,9 +71,8 @@ public class CourseService : ICourseService
 
     public async Task DeleteCourseAsync(int id)
     {
-        var course = await unitOfWork.Courses.GetCourseAsync(id, trackChanges: true);
-        if (course is null)
-            throw new KeyNotFoundException($"Course with id {id} was not found.");
+        var course = await unitOfWork.Courses.GetCourseAsync(id, trackChanges: true)
+            ?? throw new NotFoundException($"Course with id {id} was not found.");
 
         unitOfWork.Courses.Delete(course);
         await unitOfWork.CompleteAsync();

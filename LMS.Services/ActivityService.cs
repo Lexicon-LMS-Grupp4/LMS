@@ -1,110 +1,108 @@
-﻿using Domain.Models.Enums;
+﻿using AutoMapper;
+using Domain.Contracts.Repositories;
+using Domain.Models.Entities;
+using Domain.Models.Exceptions;
 using LMS.Shared.DTOs.Activity;
 using LMS.Shared.DTOs.Common;
+using Microsoft.AspNetCore.Identity;
 using Service.Contracts;
 
 namespace LMS.Services
 {
     /// <summary>
-    /// Activity service implementation - TODO: Replace with real database operations
+    /// Activity service implementation
     /// </summary>
-    public class ActivityService : IActivityService
+    public class ActivityService(
+        IUnitOfWork unitOfWork,
+        IMapper mapper,
+        UserManager<ApplicationUser> userManager) : IActivityService
     {
+        private readonly UserManager<ApplicationUser> _userManager = userManager;
+        private readonly IUnitOfWork _unitOfWork = unitOfWork;
+        private readonly IMapper _mapper = mapper;
+
         public async Task<PagedResultDto<ActivityDto>> GetAllActivitiesAsync(int page, int pageSize, int? moduleId = null)
         {
-            // TODO: Replace with real database query
-            var mockActivities = new List<ActivityDto>
-        {
-            new ActivityDto
-            {
-                Id = 1,
-                ModuleId = moduleId ?? 1,
-                ModuleName = "Introduction to C#",
-                Name = "Variables and Data Types",
-                Description = "Learn about variables",
-                Type = ActivityType.Lecture,
-                StartTime = DateTime.Now,
-                EndTime = DateTime.Now.AddHours(2),
-                DocumentCount = 3,
-                SubmissionCount = 0
-            }
-        };
+            var (activities, totalCount) = await _unitOfWork.Activities.GetAllActivitiesAsync(page, pageSize, moduleId);
 
-            return await Task.FromResult(new PagedResultDto<ActivityDto>
+            return new PagedResultDto<ActivityDto>
             {
-                Items = mockActivities,
-                TotalCount = mockActivities.Count,
+                Items = _mapper.Map<List<ActivityDto>>(activities),
+                TotalCount = totalCount,
                 PageNumber = page,
                 PageSize = pageSize
-            });
+            };
         }
 
-        public async Task<ActivityDto?> GetActivityByIdAsync(int id)
+        public async Task<ActivityDto> GetActivityByIdAsync(int id)
         {
-            // TODO: Replace with real database query
-            return await Task.FromResult(new ActivityDto
-            {
-                Id = id,
-                ModuleId = 1,
-                ModuleName = "Introduction to C#",
-                Name = "Variables and Data Types",
-                Description = "Learn about variables",
-                Type = ActivityType.Lecture,
-                StartTime = DateTime.Now,
-                EndTime = DateTime.Now.AddHours(2),
-                DocumentCount = 3,
-                SubmissionCount = 0
-            });
+            var activity = await _unitOfWork.Activities.FindByIdAsync(id) ??
+                throw new NotFoundException($"Activity by id: '{id}', does not exist");
+
+            var activityDto = _mapper.Map<ActivityDto>(activity);
+
+            return activityDto;
         }
 
-        public async Task<ActivityDetailDto?> GetActivityDetailByIdAsync(int id)
+        public async Task<ActivityDetailDto> GetActivityDetailByIdAsync(int id)
         {
-            // TODO: Replace with real database query
-            return await Task.FromResult(new ActivityDetailDto
-            {
-                Id = id,
-                ModuleId = 1,
-                ModuleName = "Introduction to C#",
-                Name = "Variables and Data Types",
-                Description = "Learn about variables",
-                Type = ActivityType.Lecture,
-                StartTime = DateTime.Now,
-                EndTime = DateTime.Now.AddHours(2),
-                DocumentCount = 3,
-                SubmissionCount = 0,
-                Documents = new(),
-                Submissions = new()
-            });
+            var activity = await _unitOfWork.Activities.GetActivityWithDetailAsync(id) ??
+                throw new NotFoundException($"Activity by id: '{id}', does not exist");
+
+            Console.WriteLine("TESTTTTT");
+            Console.WriteLine(activity.GetType().Name);
+
+            var activityDetailDto = _mapper.Map<ActivityDetailDto>(activity);
+
+            return activityDetailDto;
         }
 
         public async Task<ActivityDto> CreateActivityAsync(CreateActivityDto dto)
         {
-            // TODO: Create entity and save to database
-            return await Task.FromResult(new ActivityDto
-            {
-                Id = 1,
-                ModuleId = dto.ModuleId,
-                ModuleName = "Module Name",
-                Name = dto.Name,
-                Description = dto.Description,
-                Type = dto.Type,
-                StartTime = dto.StartTime,
-                EndTime = dto.EndTime,
-                DocumentCount = 0,
-                SubmissionCount = 0
-            });
+            var module = await _unitOfWork.Modules.FindByIdAsync(dto.ModuleId) ??
+                throw new NotFoundException($"Module by id: '{dto.ModuleId}', does not exist");
+
+            var activity = _mapper.Map<Activity>(dto);
+
+            activity.Module = module;
+
+            _unitOfWork.Activities.Create(activity);
+            await _unitOfWork.CompleteAsync();
+
+            var activityDto = _mapper.Map<ActivityDto>(activity);
+
+            return activityDto;
         }
 
         public async Task UpdateActivityAsync(int id, UpdateActivityDto dto)
         {
-            // TODO: Update entity in database
-            await Task.CompletedTask;
+            var activity = await _unitOfWork.Activities.FindByIdAsync(id) ??
+                throw new NotFoundException($"Activity by id: '{id}', does not exist");
+
+            _mapper.Map(dto, activity);
+
+            _unitOfWork.Activities.Update(activity);
+            await _unitOfWork.CompleteAsync();
+        }
+
+        public async Task PatchActivityAsync(int id, PatchActivityDto dto)
+        {
+            var activity = await _unitOfWork.Activities.FindByIdAsync(id) ??
+                throw new NotFoundException($"Activity by id: '{id}', does not exist");
+
+            _mapper.Map(dto, activity);
+
+            _unitOfWork.Activities.Update(activity);
+            await _unitOfWork.CompleteAsync();
         }
 
         public async Task DeleteActivityAsync(int id)
         {
-            // TODO: Delete entity from database
-            await Task.CompletedTask;
+            var activity = await _unitOfWork.Activities.FindByIdAsync(id) ??
+                throw new NotFoundException($"Activity with id: '{id}' does not exist");
+
+            _unitOfWork.Activities.Delete(activity);
+            await _unitOfWork.CompleteAsync();
         }
     }
 }

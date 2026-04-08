@@ -10,7 +10,6 @@ public class Submission : EntityBase
     public Document? Document { get; set; }
     public DateTime SubmittedAt { get; set; }
     public bool IsLate { get; set; }
-    public string FeedbackText { get; set; } = string.Empty;
-    public DateTime FeedbackGivenAt { get; set; }
+    public ICollection<SubmissionComment> Comments { get; set; } = [];
 
 }

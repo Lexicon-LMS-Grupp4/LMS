@@ -1,7 +1,6 @@
 using LMS.API.Extensions;
 using LMS.API.Services;
 using LMS.Infractructure.Data;
-using LMS.Infractructure.Repositories;
 
 namespace LMS.API;
 
@@ -17,19 +16,18 @@ public class Program
         builder.Services.ConfigureSql(builder.Configuration);
         builder.Services.ConfigureControllers();
 
+        builder.Services.RegisterLazy();
         builder.Services.AddRepositories();
         builder.Services.AddServiceLayer();
 
-        builder.Services.AddScoped<ICourseRepository, CourseRepository>();
-        builder.Services.AddScoped<IModuleRepository, ModuleRepository>();
-        builder.Services.AddScoped<IActivityRepository, ActivityRepository>();
-        builder.Services.AddScoped<IDocumentRepository, DocumentRepository>();
+
+        builder.Services.AddFileStorage(builder.Environment);
 
         builder.Services.ConfigureAuthentication(builder.Configuration);
         builder.Services.ConfigureIdentity();
 
         builder.Services.AddHostedService<DataSeedHostingService>();
-        builder.Services.AddAutoMapper(cfg => cfg.AddProfile<MapperProfile>());
+        builder.Services.AddAutoMapper(cfg => { }, typeof(MapperProfile));
         builder.Services.ConfigureCors();
         builder.Services.ConfigureSwagger();
 
@@ -54,6 +52,8 @@ public class Program
 
         app.UseAuthentication();
         app.UseAuthorization();
+
+        app.UseDocumentFileStorage();
 
         app.MapControllers();
 

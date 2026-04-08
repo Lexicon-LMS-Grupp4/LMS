@@ -1,0 +1,487 @@
+﻿@page "/student/dashboard"
+@attribute [Authorize(Roles = "Student")]
+@using LMS.Shared.DTOs.Activity
+@using LMS.Shared.DTOs.Course
+@using LMS.Shared.DTOs.Module
+@using LMS.Shared.DTOs.User
+@using Domain.Models.Enums
+@inject ICourseService CourseService
+@inject IModuleService ModuleService
+@inject IActivityService ActivityService
+@inject NavigationManager Navigation
+
+<PageTitle>My Dashboard</PageTitle>
+
+<div class="container-fluid py-4">
+
+    @* ---- Header ---- *@
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+        <div>
+            <h2 class="mb-0">My Dashboard</h2>
+            <p class="text-muted small mb-0">Welcome back! Here's what's happening in your course.</p>
+        </div>
+    </div>
+
+    @* ---- Feedback ---- *@
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            @errorMessage
+            <button type="button" class="btn-close" @onclick="() => errorMessage = null"></button>
+        </div>
+    }
+
+    @* ---- Loading ---- *@
+    @if (isLoading)
+    {
+        <div class="text-center py-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2 text-muted">Loading your course...</p>
+        </div>
+    }
+    else if (!string.IsNullOrEmpty(loadError))
+    {
+        <div class="alert alert-danger">
+            <p>@loadError</p>
+            <button class="btn btn-outline-danger btn-sm" @onclick="LoadDashboardAsync">Retry</button>
+        </div>
+    }
+    else if (course is null)
+    {
+        <div class="text-center py-5 text-muted">
+            <i class="bi bi-journal-x fs-1"></i>
+            <p class="mt-2">You are not enrolled in any course yet. Contact your teacher.</p>
+        </div>
+    }
+    else
+    {
+        @* ==============================
+           SUMMARY STATS ROW
+           ============================== *@
+        <div class="row g-3 mb-4">
+            <div class="col-6 col-md-3">
+                <div class="card text-center h-100 border-primary border-opacity-25">
+                    <div class="card-body py-3">
+                        <div class="fs-2 fw-bold text-primary">@modules.Count</div>
+                        <div class="text-muted small">Modules</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="card text-center h-100 border-success border-opacity-25">
+                    <div class="card-body py-3">
+                        <div class="fs-2 fw-bold text-success">@allActivities.Count</div>
+                        <div class="text-muted small">Activities</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="card text-center h-100 border-warning border-opacity-25">
+                    <div class="card-body py-3">
+                        <div class="fs-2 fw-bold text-warning">
+                            @allActivities.Count(a => a.Type == ActivityType.Assignment)
+                        </div>
+                        <div class="text-muted small">Assignments</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="card text-center h-100 border-danger border-opacity-25">
+                    <div class="card-body py-3">
+                        <div class="fs-2 fw-bold text-danger">@upcomingDeadlines.Count</div>
+                        <div class="text-muted small">Upcoming Deadlines</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-4">
+
+            @* ==============================
+               LEFT COLUMN
+               ============================== *@
+            <div class="col-lg-8">
+
+                @* ---- Course Info ---- *@
+                <div class="card mb-4">
+                    <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+                        <h6 class="mb-0"><i class="bi bi-mortarboard me-2"></i>My Course</h6>
+                        <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25">
+                            Started @course.StartDate.ToString("yyyy-MM-dd")
+                        </span>
+                    </div>
+                    <div class="card-body">
+                        <h5 class="fw-bold mb-1">@course.Name</h5>
+                        <p class="text-muted mb-3">@course.Description</p>
+                        <div class="d-flex flex-wrap gap-3 small text-muted">
+                            <span><i class="bi bi-journal-text me-1"></i>@course.ModuleCount modules</span>
+                            <span><i class="bi bi-people me-1"></i>@course.StudentCount students</span>
+                        </div>
+                    </div>
+                </div>
+
+                @* ---- Modules & Activities ---- *@
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h6 class="mb-0"><i class="bi bi-journal-text me-2"></i>Course Modules</h6>
+                    </div>
+                    <div class="card-body p-0">
+                        @if (!modules.Any())
+                        {
+                            <p class="text-muted p-3 mb-0">No modules available yet.</p>
+                        }
+                        else
+                        {
+                            @foreach (var module in modules)
+                            {
+                                var isActive = module.StartDate <= DateTime.Now &&
+                                               (module.EndDate == null || module.EndDate >= DateTime.Now);
+                                var isPast   = module.EndDate < DateTime.Now;
+
+                                <div class="border-bottom">
+                                    @* Module header row *@
+                                    <div class="d-flex justify-content-between align-items-center gap-2 px-3 py-2"
+                                         style="cursor:pointer"
+                                         @onclick="() => ToggleModule(module.Id)">
+                                        <div class="flex-grow-1">
+                                            <div class="d-flex align-items-center gap-2 flex-wrap">
+                                                <span class="fw-semibold">@module.Name</span>
+                                                @if (isActive)
+                                                {
+                                                    <span class="badge bg-success">Active</span>
+                                                }
+                                                else if (isPast)
+                                                {
+                                                    <span class="badge bg-secondary">Completed</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge bg-info text-dark">Upcoming</span>
+                                                }
+                                            </div>
+                                            <div class="text-muted small mt-1">
+                                                @module.StartDate.ToString("yyyy-MM-dd")
+                                                <span> → @module.EndDate.ToString("yyyy-MM-dd")</span>
+                                                <span class="ms-2">
+                                                    <i class="bi bi-lightning me-1"></i>@module.ActivityCount activities
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <i class="bi bi-chevron-@(expandedModuleId == module.Id ? "up" : "down") text-muted flex-shrink-0"></i>
+                                    </div>
+
+                                    @* Activities sub-panel *@
+                                    @if (expandedModuleId == module.Id)
+                                    {
+                                        <div class="bg-light px-3 py-2">
+                                            @if (loadingActivitiesForModule == module.Id)
+                                            {
+                                                <div class="text-center py-2">
+                                                    <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+                                                </div>
+                                            }
+                                            else
+                                            {
+                                                var acts = moduleActivities.TryGetValue(module.Id, out var list) ? list : [];
+                                                @if (!acts.Any())
+                                                {
+                                                    <p class="text-muted small mb-0 py-1">No activities in this module yet.</p>
+                                                }
+                                                else
+                                                {
+                                                    <div class="list-group list-group-flush">
+                                                        @foreach (var act in acts)
+                                                        {
+                                                            var isOverdue = act.EndTime < DateTime.Now;
+                                                            <div class="list-group-item list-group-item-action bg-transparent px-0 py-2">
+                                                                <div class="d-flex justify-content-between align-items-start gap-2">
+                                                                    <div>
+                                                                        <div class="d-flex align-items-center gap-2 flex-wrap">
+                                                                            <span class="fw-semibold small">@act.Name</span>
+                                                                            <span class="badge @GetActivityTypeBadge(act.Type) badge-sm">@act.Type</span>
+                                                                            @if (isOverdue)
+                                                                            {
+                                                                                <span class="badge bg-danger badge-sm">Past</span>
+                                                                            }
+                                                                        </div>
+                                                                        @if (!string.IsNullOrEmpty(act.Description))
+                                                                        {
+                                                                            <div class="text-muted small mt-1">@act.Description</div>
+                                                                        }
+                                                                        <div class="text-muted small mt-1">
+                                                                            <i class="bi bi-clock me-1"></i>
+                                                                            @act.StartTime.ToString("MMM d, HH:mm")
+                                                                            <span class="mx-1">–</span>
+                                                                            <span class="@(isOverdue ? "text-danger" : "")">
+                                                                                @act.EndTime.ToString("MMM d, HH:mm")
+                                                                            </span>
+                                                                        </div>
+                                                                    </div>
+                                                                    @if (act.Type == ActivityType.Assignment)
+                                                                    {
+                                                                        <button class="btn btn-sm @(isOverdue ? "btn-outline-secondary" : "btn-outline-primary") flex-shrink-0"
+                                                                            @onclick="() => Navigation.NavigateTo(GetDetailsUrl(act.Id))">
+                                                                            <i class="bi bi-send me-1"></i>
+                                                                            <span class="d-none d-sm-inline">Submit</span>
+                                                                        </button>
+                                                                    }
+                                                                </div>
+                                                            </div>
+                                                        }
+                                                    </div>
+                                                }
+                                            }
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        }
+                    </div>
+                </div>
+            </div>
+
+            @* ==============================
+               RIGHT COLUMN
+               ============================== *@
+            <div class="col-lg-4">
+
+                @* ---- Upcoming Deadlines ---- *@
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h6 class="mb-0"><i class="bi bi-alarm me-2"></i>Upcoming Deadlines</h6>
+                    </div>
+                    <div class="card-body p-0">
+                        @if (!upcomingDeadlines.Any())
+                        {
+                            <p class="text-muted p-3 mb-0">No upcoming deadlines. 🎉</p>
+                        }
+                        else
+                        {
+                            <ul class="list-group list-group-flush">
+                                @foreach (var act in upcomingDeadlines)
+                                {
+                                    var daysLeft  = (act.EndTime - DateTime.Now).TotalDays;
+                                    var urgency   = daysLeft <= 1 ? "danger" : daysLeft <= 3 ? "warning" : "primary";
+                                    <li class="list-group-item px-3 py-2">
+                                        <div class="d-flex justify-content-between align-items-start gap-2">
+                                            <div class="flex-grow-1">
+                                                <div class="fw-semibold small">@act.Name</div>
+                                                <div class="text-muted small">@act.ModuleName</div>
+                                            </div>
+                                            <span class="badge bg-@urgency flex-shrink-0">
+                                                @if (daysLeft < 1)
+                                                {
+                                                    <span>Today</span>
+                                                }
+                                                else if (daysLeft < 2)
+                                                {
+                                                    <span>Tomorrow</span>
+                                                }
+                                                else
+                                                {
+                                                    <span>@((int)daysLeft)d left</span>
+                                                }
+                                            </span>
+                                        </div>
+                                        <div class="text-muted small mt-1">
+                                            <i class="bi bi-clock me-1"></i>@act.EndTime.ToString("MMM d, HH:mm")
+                                        </div>
+                                    </li>
+                                }
+                            </ul>
+                        }
+                    </div>
+                </div>
+
+                @* ---- Classmates ---- *@
+                <div class="card mb-4">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0"><i class="bi bi-people me-2"></i>Classmates</h6>
+                        <span class="badge bg-secondary">@classmates.Count</span>
+                    </div>
+                    <div class="card-body p-0">
+                        @if (isLoadingClassmates)
+                        {
+                            <div class="text-center py-3">
+                                <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+                            </div>
+                        }
+                        else if (!classmates.Any())
+                        {
+                            <p class="text-muted p-3 mb-0">No other students enrolled yet.</p>
+                        }
+                        else
+                        {
+                            <ul class="list-group list-group-flush">
+                                @foreach (var mate in classmates.Take(10))
+                                {
+                                    <li class="list-group-item px-3 py-2">
+                                        <div class="d-flex align-items-center gap-2">
+                                            <div class="rounded-circle bg-primary bg-opacity-10 text-primary d-flex align-items-center justify-content-center flex-shrink-0"
+                                                 style="width:32px;height:32px;font-size:0.8rem;font-weight:600;">
+                                                @(mate.Name.Length > 0 ? mate.Name[0].ToString().ToUpper() : "?")
+                                            </div>
+                                            <div class="overflow-hidden">
+                                                <div class="small fw-semibold text-truncate">@mate.Name</div>
+                                                <div class="small text-muted text-truncate">@mate.Email</div>
+                                            </div>
+                                        </div>
+                                    </li>
+                                }
+                                @if (classmates.Count > 10)
+                                {
+                                    <li class="list-group-item px-3 py-2 text-muted small text-center">
+                                        + @(classmates.Count - 10) more students
+                                    </li>
+                                }
+                            </ul>
+                        }
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    // ---- Data ----
+    private CourseDto? course;
+    private List<ModuleDto> modules = [];
+    private List<ActivityDto> allActivities = [];
+    private List<ActivityDto> upcomingDeadlines = [];
+    private List<StudentDto> classmates = [];
+    private Dictionary<int, List<ActivityDto>> moduleActivities = new();
+
+    // ---- Page state ----
+    private bool isLoading;
+    private bool isLoadingClassmates;
+    private int? loadingActivitiesForModule;
+    private string? loadError;
+    private string? errorMessage;
+    private int? expandedModuleId;
+
+    // ---- Lifecycle ----
+    protected override async Task OnInitializedAsync()
+        => await LoadDashboardAsync();
+
+    private async Task LoadDashboardAsync()
+    {
+        isLoading = true;
+        loadError = null;
+        StateHasChanged();
+
+        try
+        {
+            // TODO: replace with GET /api/studentcourse/mycourse (needs auth token forwarding).
+            // For now we load the first available course as a stand-in.
+            var coursePage = await CourseService.GetAllCoursesAsync(1, 1);
+            if (coursePage?.Items.FirstOrDefault() is CourseDto first)
+            {
+                var detail = await CourseService.GetCourseDetailByIdAsync(first.Id);
+                if (detail is not null)
+                {
+                    course  = detail;
+                    modules = detail.Modules;
+                }
+            }
+
+            if (course is not null)
+            {
+                // Load all activities for deadline calculation
+                var actPage = await ActivityService.GetAllActivitiesAsync(pageSize: 100);
+                allActivities = actPage?.Items ?? [];
+
+                upcomingDeadlines = allActivities
+                    .Where(a => a.Type == ActivityType.Assignment
+                             && a.EndTime >= DateTime.Now
+                             && a.EndTime <= DateTime.Now.AddDays(7))
+                    .OrderBy(a => a.EndTime)
+                    .ToList();
+
+                // Load classmates in parallel
+                _ = LoadClassmatesAsync(course.Id);
+            }
+        }
+        catch (Exception ex)
+        {
+            loadError = $"Failed to load dashboard. {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task LoadClassmatesAsync(int courseId)
+    {
+        isLoadingClassmates = true;
+        StateHasChanged();
+
+        try
+        {
+            // TODO: wire GET /api/studentcourse/classmates through IStudentCourseService client
+            // For now classmates list stays empty until that service is added
+            classmates = [];
+            await Task.CompletedTask;
+        }
+        catch
+        {
+            classmates = [];
+        }
+        finally
+        {
+            isLoadingClassmates = false;
+            StateHasChanged();
+        }
+    }
+
+    // ---- Module expand / lazy-load activities ----
+    private async Task ToggleModule(int moduleId)
+    {
+        if (expandedModuleId == moduleId)
+        {
+            expandedModuleId = null;
+            return;
+        }
+
+        expandedModuleId = moduleId;
+
+        if (!moduleActivities.ContainsKey(moduleId))
+        {
+            loadingActivitiesForModule = moduleId;
+            StateHasChanged();
+
+            try
+            {
+                var result = await ActivityService.GetAllActivitiesAsync(moduleId: moduleId, pageSize: 50);
+                moduleActivities[moduleId] = result?.Items ?? [];
+            }
+            catch
+            {
+                moduleActivities[moduleId] = [];
+            }
+            finally
+            {
+                loadingActivitiesForModule = null;
+            }
+        }
+    }
+
+    // ---- Helpers ----
+    private static string GetActivityTypeBadge(ActivityType type) => type switch
+    {
+        ActivityType.Assignment => "bg-warning text-dark",
+        ActivityType.Exercise       => "bg-danger",
+        ActivityType.Lecture    => "bg-primary",
+        ActivityType.ELearning => "bg-success",
+        _                       => "bg-secondary"
+    };
+
+    private string GetDetailsUrl(int id)
+    {
+        return $"/student/activities/{id}/submit";
+    }
+}

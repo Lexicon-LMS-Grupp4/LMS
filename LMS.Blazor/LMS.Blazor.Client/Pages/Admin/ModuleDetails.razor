@@ -1,0 +1,582 @@
+﻿@page "/admin/modules/{ModuleId:int}/details"
+@attribute [Authorize(Roles = "Teacher")]
+@using LMS.Shared.DTOs.Activity
+@using LMS.Shared.DTOs.Document
+@using LMS.Shared.DTOs.Module
+@using Domain.Models.Enums
+@inject IModuleService ModuleService
+@inject IActivityService ActivityService
+@inject NavigationManager Navigation
+
+<PageTitle>Module Details</PageTitle>
+
+<div class="container-fluid py-4">
+
+    @* ---- Header ---- *@
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+        <h2 class="mb-0">Module Details</h2>
+        <button class="btn btn-outline-secondary" @onclick="GoBack">
+            <i class="bi bi-arrow-left"></i>
+            <span class="d-none d-md-inline ms-1">Back to Modules</span>
+        </button>
+    </div>
+
+    @* ---- Feedback ---- *@
+    @if (!string.IsNullOrEmpty(successMessage))
+    {
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            @successMessage
+            <button type="button" class="btn-close" @onclick="() => successMessage = null"></button>
+        </div>
+    }
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            @errorMessage
+            <button type="button" class="btn-close" @onclick="() => errorMessage = null"></button>
+        </div>
+    }
+
+    @* ---- Loading / error / not found ---- *@
+    @if (isLoading)
+    {
+        <div class="text-center py-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2 text-muted">Loading module details...</p>
+        </div>
+    }
+    else if (!string.IsNullOrEmpty(loadError))
+    {
+        <div class="alert alert-danger">
+            <p>@loadError</p>
+            <button class="btn btn-outline-danger btn-sm" @onclick="LoadModuleAsync">Retry</button>
+        </div>
+    }
+    else if (module is null)
+    {
+        <div class="alert alert-warning">Module not found.</div>
+    }
+    else
+    {
+        @* ==============================
+           MODULE INFO CARD
+           ============================== *@
+        <div class="card mb-4">
+            <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+                <h5 class="mb-0">@module.Name</h5>
+                <div class="d-flex gap-2 flex-wrap">
+                    <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25">
+                        @module.CourseName
+                    </span>
+                    <span class="badge bg-secondary">@activities.Count Activities</span>
+                    <span class="badge bg-info text-dark">@documents.Count Documents</span>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-5">
+                        <p class="text-muted mb-1 small">Description</p>
+                        <p class="mb-0">@(string.IsNullOrEmpty(module.Description) ? "—" : module.Description)</p>
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <p class="text-muted mb-1 small">Start Date</p>
+                        <p class="mb-0">@module.StartDate.ToString("yyyy-MM-dd")</p>
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <p class="text-muted mb-1 small">End Date</p>
+                        <p class="mb-0">@module.EndDate.ToString("yyyy-MM-dd")</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @* ==============================
+           ACTIVITIES SECTION
+           ============================== *@
+        <div class="card mb-4">
+            <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+                <h6 class="mb-0"><i class="bi bi-lightning me-2"></i>Activities</h6>
+                <button class="btn btn-sm btn-primary" @onclick="() => showAddActivity = !showAddActivity">
+                    <i class="bi bi-plus-lg"></i>
+                    <span class="d-none d-md-inline ms-1">Add Activity</span>
+                </button>
+            </div>
+
+            @* ---- Add Activity Panel ---- *@
+            @if (showAddActivity)
+            {
+                <div class="card-body border-bottom bg-light">
+                    <div class="row g-2 align-items-end">
+                        <div class="col-12 col-sm-6 col-xl-3">
+                            <label class="form-label small fw-semibold mb-1">Name <span class="text-danger">*</span></label>
+                            <input class="form-control form-control-sm @(activityErrors.ContainsKey("Name") ? "is-invalid" : "")"
+                                   @bind="newActivity.Name"
+                                   placeholder="e.g. Lecture 1" />
+                            @if (activityErrors.TryGetValue("Name", out var nameErr))
+                            {
+                                <div class="invalid-feedback">@nameErr</div>
+                            }
+                        </div>
+
+                        <div class="col-12 col-sm-6 col-xl-2">
+                            <label class="form-label small fw-semibold mb-1">Description</label>
+                            <input class="form-control form-control-sm"
+                                   @bind="newActivity.Description"
+                                   placeholder="Optional" />
+                        </div>
+
+                        <div class="col-12 col-sm-4 col-xl-2">
+                            <label class="form-label small fw-semibold mb-1">Type <span class="text-danger">*</span></label>
+                            <select class="form-select form-select-sm" @bind="newActivity.Type">
+                                @foreach (var type in Enum.GetValues<ActivityType>())
+                                {
+                                    <option value="@type">@type</option>
+                                }
+                            </select>
+                        </div>
+
+                        <div class="col-12 col-sm-4 col-xl-2">
+                            <label class="form-label small fw-semibold mb-1">Start <span class="text-danger">*</span></label>
+                            <input type="datetime-local"
+                                   class="form-control form-control-sm @(activityErrors.ContainsKey("StartTime") ? "is-invalid" : "")"
+                                   @bind="newActivity.StartTime" />
+                            @if (activityErrors.TryGetValue("StartTime", out var startErr))
+                            {
+                                <div class="invalid-feedback">@startErr</div>
+                            }
+                        </div>
+
+                        <div class="col-12 col-sm-4 col-xl-2">
+                            <label class="form-label small fw-semibold mb-1">End <span class="text-danger">*</span></label>
+                            <input type="datetime-local"
+                                   class="form-control form-control-sm @(activityErrors.ContainsKey("EndTime") ? "is-invalid" : "")"
+                                   @bind="newActivity.EndTime" />
+                            @if (activityErrors.TryGetValue("EndTime", out var endErr))
+                            {
+                                <div class="invalid-feedback">@endErr</div>
+                            }
+                        </div>
+
+                        <div class="col-12 col-xl-1 d-flex gap-1">
+                            <button class="btn btn-sm btn-success flex-fill"
+                                    @onclick="AddActivityAsync"
+                                    disabled="@isAddingActivity">
+                                @if (isAddingActivity)
+                                {
+                                    <span class="spinner-border spinner-border-sm"></span>
+                                }
+                                else
+                                {
+                                    <span>Save</span>
+                                }
+                            </button>
+                            <button class="btn btn-sm btn-secondary"
+                                    @onclick="() => { showAddActivity = false; activityErrors = new(); }">✕</button>
+                        </div>
+                    </div>
+                </div>
+            }
+
+            @* ---- Activity table ---- *@
+            <div class="card-body p-0">
+                @if (!activities.Any())
+                {
+                    <p class="text-muted p-3 mb-0">No activities yet. Add the first one.</p>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Type</th>
+                                    <th class="d-none d-sm-table-cell">Start</th>
+                                    <th class="d-none d-sm-table-cell">End</th>
+                                    <th class="text-center d-none d-md-table-cell">Docs</th>
+                                    <th class="text-center d-none d-md-table-cell">Submissions</th>
+                                    <th style="width:100px;"></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var act in activities)
+                                {
+                                    <tr>
+                                        <td>
+                                            <div class="fw-semibold">@act.Name</div>
+                                            @if (!string.IsNullOrEmpty(act.Description))
+                                            {
+                                                <div class="text-muted small text-truncate" style="max-width:200px;">@act.Description</div>
+                                            }
+                                        </td>
+                                        <td>
+                                            <span class="badge @GetActivityTypeBadge(act.Type)">@act.Type</span>
+                                        </td>
+                                        <td class="d-none d-sm-table-cell text-muted small">
+                                            @act.StartTime.ToString("yyyy-MM-dd HH:mm")
+                                        </td>
+                                        <td class="d-none d-sm-table-cell text-muted small">
+                                            @act.EndTime.ToString("yyyy-MM-dd HH:mm")
+                                        </td>
+                                        <td class="text-center d-none d-md-table-cell">
+                                            <span class="badge bg-info text-dark">@act.DocumentCount</span>
+                                        </td>
+                                        <td class="text-center d-none d-md-table-cell">
+                                            <span class="badge bg-warning text-dark">@act.SubmissionCount</span>
+                                        </td>
+                                        <td class="text-end text-nowrap">
+                                            <button class="btn btn-sm btn-outline-primary me-1"
+                                                    title="View Details"
+                                                    @onclick="() => Navigation.NavigateTo(GetDetailsUrl(act.Id))">
+                                                <i class="bi bi-eye"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-danger"
+                                                    title="Delete"
+                                                    @onclick="() => HandleDeleteActivity(act)">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+
+        @* ==============================
+           DOCUMENTS SECTION
+           ============================== *@
+        <div class="card mb-4">
+            <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+                <h6 class="mb-0"><i class="bi bi-file-earmark me-2"></i>Documents</h6>
+                <button class="btn btn-sm btn-primary"
+                        title="Upload Document"
+                        @onclick="() => showUploadDocument = !showUploadDocument">
+                    <i class="bi bi-upload"></i>
+                    <span class="d-none d-md-inline ms-1">Upload Document</span>
+                </button>
+            </div>
+
+            @if (showUploadDocument)
+            {
+                <div class="card-body border-bottom bg-light">
+                    <div class="alert alert-info mb-0 py-2">
+                        <i class="bi bi-info-circle me-2"></i>
+                        Document upload requires an authenticated user context
+                        (<code>UploadedByUserId</code>) — not yet wired up on this page.
+                    </div>
+                </div>
+            }
+
+            <div class="card-body p-0">
+                @if (!documents.Any())
+                {
+                    <p class="text-muted p-3 mb-0">No documents attached to this module yet.</p>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Name</th>
+                                    <th class="d-none d-md-table-cell">File</th>
+                                    <th class="d-none d-sm-table-cell">Uploaded</th>
+                                    <th class="d-none d-sm-table-cell">By</th>
+                                    <th style="width:60px;"></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var doc in documents)
+                                {
+                                    <tr>
+                                        <td>
+                                            <div class="fw-semibold">@doc.DisplayName</div>
+                                            @if (!string.IsNullOrEmpty(doc.Description))
+                                            {
+                                                <div class="text-muted small text-truncate" style="max-width:200px;">@doc.Description</div>
+                                            }
+                                        </td>
+                                        <td class="d-none d-md-table-cell text-muted small">
+                                            <i class="bi bi-file-earmark me-1"></i>@doc.DisplayName
+                                        </td>
+                                        <td class="d-none d-sm-table-cell text-muted small">
+                                            @doc.UploadedAt.ToString("yyyy-MM-dd")
+                                        </td>
+                                        <td class="d-none d-sm-table-cell text-muted small">
+                                            @doc.UploadedByUserName
+                                        </td>
+                                        <td class="text-end">
+                                            <button class="btn btn-sm btn-outline-danger"
+                                                    title="Remove Document"
+                                                    @onclick="() => HandleDeleteDocument(doc)">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@* ---- Delete Activity modal ---- *@
+@if (showDeleteActivityConfirm && activityToDelete is not null)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background:rgba(0,0,0,0.5)">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Confirm Delete</h5>
+                </div>
+                <div class="modal-body">
+                    Are you sure you want to delete activity <strong>@activityToDelete.Name</strong>?
+                    All associated submissions will also be removed. This cannot be undone.
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="CancelDeleteActivity">Cancel</button>
+                    <button class="btn btn-danger" @onclick="ConfirmDeleteActivityAsync" disabled="@isDeletingActivity">
+                        @if (isDeletingActivity)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"></span>
+                        }
+                        Delete
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@* ---- Delete Document modal ---- *@
+@if (showDeleteDocumentConfirm && documentToDelete is not null)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background:rgba(0,0,0,0.5)">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Confirm Delete</h5>
+                </div>
+                <div class="modal-body">
+                    Are you sure you want to remove <strong>@documentToDelete.DisplayName</strong>?
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="() => showDeleteDocumentConfirm = false">Cancel</button>
+                    <button class="btn btn-danger" @onclick="ConfirmDeleteDocumentAsync">Delete</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public int ModuleId { get; set; }
+
+    // ---- Data ----
+    private ModuleDetailDto? module;
+    private List<ActivityDto> activities = [];
+    private List<DocumentDto> documents = [];
+
+    // ---- Page state ----
+    private bool isLoading;
+    private string? loadError;
+    private string? successMessage;
+    private string? errorMessage;
+
+    // ---- Add activity ----
+    private bool showAddActivity;
+    private bool isAddingActivity;
+    private ActivityFormModel newActivity = new();
+    private Dictionary<string, string> activityErrors = new();
+
+    // ---- Delete activity ----
+    private bool showDeleteActivityConfirm;
+    private bool isDeletingActivity;
+    private ActivityDto? activityToDelete;
+
+    // ---- Documents ----
+    private bool showUploadDocument;
+    private bool showDeleteDocumentConfirm;
+    private DocumentDto? documentToDelete;
+
+    // ---- Lifecycle ----
+    protected override async Task OnInitializedAsync()
+        => await LoadModuleAsync();
+
+    private async Task LoadModuleAsync()
+    {
+        isLoading = true;
+        loadError = null;
+        StateHasChanged();
+
+        try
+        {
+            module = await ModuleService.GetModuleDetailByIdAsync(ModuleId);
+            if (module is not null)
+            {
+                activities = module.Activities;
+                documents = module.Documents;
+            }
+        }
+        catch (Exception ex)
+        {
+            loadError = $"Failed to load module. {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    // ---- Activity actions ----
+    private async Task AddActivityAsync()
+    {
+        activityErrors = ValidateActivityForm();
+        if (activityErrors.Any()) return;
+
+        isAddingActivity = true;
+        try
+        {
+            var dto = new CreateActivityDto
+            {
+                ModuleId = ModuleId,
+                Name = newActivity.Name,
+                Description = newActivity.Description,
+                Type = newActivity.Type,
+                StartTime = newActivity.StartTime,
+                EndTime = newActivity.EndTime
+            };
+
+            var created = await ActivityService.CreateActivityAsync(dto);
+            if (created is not null)
+            {
+                activities.Add(created);
+                successMessage = $"Activity '{created.Name}' created.";
+                newActivity = new();
+                showAddActivity = false;
+                activityErrors = new();
+            }
+            else
+            {
+                errorMessage = "Failed to create activity. Please try again.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            isAddingActivity = false;
+        }
+    }
+
+    private void HandleDeleteActivity(ActivityDto act)
+    {
+        activityToDelete = act;
+        showDeleteActivityConfirm = true;
+    }
+
+    private void CancelDeleteActivity()
+    {
+        activityToDelete = null;
+        showDeleteActivityConfirm = false;
+    }
+
+    private async Task ConfirmDeleteActivityAsync()
+    {
+        if (activityToDelete is null) return;
+
+        isDeletingActivity = true;
+        try
+        {
+            await ActivityService.DeleteActivityAsync(activityToDelete.Id);
+            activities.RemoveAll(a => a.Id == activityToDelete.Id);
+            successMessage = $"Activity '{activityToDelete.Name}' deleted.";
+            activityToDelete = null;
+            showDeleteActivityConfirm = false;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to delete activity. {ex.Message}";
+            showDeleteActivityConfirm = false;
+        }
+        finally
+        {
+            isDeletingActivity = false;
+        }
+    }
+
+    // ---- Document actions ----
+    private void HandleDeleteDocument(DocumentDto doc)
+    {
+        documentToDelete = doc;
+        showDeleteDocumentConfirm = true;
+    }
+
+    private async Task ConfirmDeleteDocumentAsync()
+    {
+        if (documentToDelete is null) return;
+
+        // TODO: wire IDocumentService to client and call DeleteDocumentAsync
+        documents.RemoveAll(d => d.Id == documentToDelete.Id);
+        successMessage = $"Document '{documentToDelete.DisplayName}' removed.";
+        documentToDelete = null;
+        showDeleteDocumentConfirm = false;
+        await Task.CompletedTask;
+    }
+
+    // ---- Validation ----
+    private Dictionary<string, string> ValidateActivityForm()
+    {
+        var errors = new Dictionary<string, string>();
+
+        if (string.IsNullOrWhiteSpace(newActivity.Name))
+            errors["Name"] = "Name is required.";
+
+        if (newActivity.StartTime == default)
+            errors["StartTime"] = "Start time is required.";
+
+        if (newActivity.EndTime == default)
+            errors["EndTime"] = "End time is required.";
+        else if (newActivity.EndTime <= newActivity.StartTime)
+            errors["EndTime"] = "End time must be after start time.";
+
+        return errors;
+    }
+
+    // ---- Helpers ----
+    private void GoBack() => Navigation.NavigateTo($"/admin/modules");
+
+    private static string GetActivityTypeBadge(ActivityType type) => type switch
+    {
+        ActivityType.Assignment  => "bg-warning text-dark",
+        ActivityType.Exercise        => "bg-danger",
+        ActivityType.Lecture     => "bg-primary",
+        ActivityType.ELearning  => "bg-success",
+        _                        => "bg-secondary"
+    };
+
+    // ---- Local models ----
+    private class ActivityFormModel
+    {
+        public string Name { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public ActivityType Type { get; set; } = ActivityType.Lecture;
+        public DateTime StartTime { get; set; } = DateTime.Today.AddHours(9);
+        public DateTime EndTime { get; set; } = DateTime.Today.AddHours(11);
+    }
+
+    private string GetDetailsUrl(int id)
+    {
+        return $"/admin/activities/{id}/details";
+    }
+}

@@ -9,8 +9,8 @@ namespace Service.Contracts
     public interface IModuleService
     {
         Task<PagedResultDto<ModuleDto>> GetAllModulesAsync(int page, int pageSize, int? courseId = null);
-        Task<ModuleDto?> GetModuleByIdAsync(int id);
-        Task<ModuleDetailDto?> GetModuleDetailByIdAsync(int id);
+        Task<ModuleDto> GetModuleByIdAsync(int id);
+        Task<ModuleDetailDto> GetModuleDetailByIdAsync(int id);
         Task<ModuleDto> CreateModuleAsync(CreateModuleDto dto);
         Task UpdateModuleAsync(int id, UpdateModuleDto dto);
         Task UpdateModulePartiallyAsync(int id, PatchModuleDto dto);

@@ -8,7 +8,7 @@
 <PageTitle>Course Management</PageTitle>
 
 <div class="container-fluid py-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
         <h2 class="mb-0">Course Management</h2>
         @if (!showForm)
         {
@@ -37,10 +37,9 @@
     @* ---- Form section ---- *@
     @if (showForm)
     {
-        <CourseFormComponent
-            Course="selectedCourse"
-            OnSubmit="HandleFormSubmit"
-            OnCancel="HandleFormCancel" />
+        <CourseFormComponent Course="selectedCourse"
+                             OnSubmit="HandleFormSubmit"
+                             OnCancel="HandleFormCancel" />
     }
 
     @* ---- List section ---- *@
@@ -68,35 +67,34 @@
         </div>
     }
     else
-{
-    <CourseListComponent
-        Courses="courses"
-        OnDetails="HandleDetailsClicked"
-        OnEdit="HandleEditClicked"
-        OnDelete="HandleDeleteClicked" />
-
-    @* ---- Pagination ---- *@
-    @if (totalPages > 1)
     {
-        <nav class="mt-3">
-            <ul class="pagination justify-content-center">
-                <li class="page-item @(currentPage == 1 ? "disabled" : "")">
-                    <button class="page-link" @onclick="() => GoToPageAsync(currentPage - 1)">Previous</button>
-                </li>
-                @for (int i = 1; i <= totalPages; i++)
-                {
-                    var pageNum = i;
+        <CourseListComponent Courses="courses"
+                             OnDetails="HandleDetailsClicked"
+                             OnEdit="HandleEditClicked"
+                             OnDelete="HandleDeleteClicked" />
+
+        @* ---- Pagination ---- *@
+        @if (totalPages > 1)
+        {
+            <nav class="mt-3">
+                <ul class="pagination justify-content-center flex-wrap">
+                    <li class="page-item @(currentPage == 1 ? "disabled" : "")">
+                        <button class="page-link" @onclick="() => GoToPageAsync(currentPage - 1)">Previous</button>
+                    </li>
+                    @for (int i = 1; i <= totalPages; i++)
+                    {
+                        var pageNum = i;
                         <li class="page-item @(currentPage == pageNum ? "active" : "")">
                             <button class="page-link" @onclick="() => GoToPageAsync(pageNum)">@pageNum</button>
+                        </li>
+                    }
+                    <li class="page-item @(currentPage == totalPages ? "disabled" : "")">
+                        <button class="page-link" @onclick="() => GoToPageAsync(currentPage + 1)">Next</button>
                     </li>
-                }
-                <li class="page-item @(currentPage == totalPages ? "disabled" : "")">
-                    <button class="page-link" @onclick="() => GoToPageAsync(currentPage + 1)">Next</button>
-                </li>
-            </ul>
-        </nav>
+                </ul>
+            </nav>
+        }
     }
-}
 </div>
 
 @* ---- Delete confirmation modal ---- *@

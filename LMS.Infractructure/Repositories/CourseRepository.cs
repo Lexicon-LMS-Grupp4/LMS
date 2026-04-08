@@ -8,7 +8,9 @@ namespace LMS.Infractructure.Repositories;
 
 public class CourseRepository : RepositoryBase<Course>, ICourseRepository
 {
-    public CourseRepository(ApplicationDbContext context) : base(context) { }
+    public CourseRepository(ApplicationDbContext context) : base(context)
+    {
+    }
 
     public async Task<(IEnumerable<Course> Courses, int TotalCount)> GetAllCoursesAsync(
         int page, int pageSize, bool trackChanges = false)
@@ -23,11 +25,6 @@ public class CourseRepository : RepositoryBase<Course>, ICourseRepository
 
     public async Task<Course?> GetCourseAsync(int id, bool trackChanges = false)
     {
-        //return await FindByCondition(c => c.Id == id, trackChanges)
-        //    .Include(c => c.Students)
-        //    .Include(c => c.Modules)
-        //    .Include(c => c.CourseTeachers)
-        //    .FirstOrDefaultAsync();
         return await FindByCondition(c => c.Id == id, trackChanges)
             .Include(c => c.Students)
             .Include(c => c.Modules)

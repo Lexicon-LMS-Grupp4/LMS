@@ -1,4 +1,5 @@
 ﻿namespace Service.Contracts;
+
 public interface IServiceManager
 {
     IAuthService AuthService { get; }
@@ -7,5 +8,6 @@ public interface IServiceManager
     IActivityService ActivityService { get; }
     IDocumentService DocumentService { get; }
     ISubmissionService SubmissionService { get; }
+    IUserService UserService { get; }
 
 }

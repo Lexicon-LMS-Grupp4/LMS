@@ -1,10 +1,10 @@
+using LMS.API.DependencyInjection;
 using LMS.Infractructure.Data;
 using LMS.Infractructure.Repositories;
 using LMS.Presentation;
 using LMS.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
 using Microsoft.OpenApi;
 using Swashbuckle.AspNetCore.Filters;
 
@@ -79,9 +79,20 @@ public static class ServiceExtensions
                 options.UseSqlServer(configuration.GetConnectionString("ApplicationDbContext") ?? throw new InvalidOperationException("Connection string 'ApplicationDbContext' not found.")));
     }
 
+    public static void RegisterLazy(this IServiceCollection services)
+    {
+        services.AddScoped(typeof(Lazy<>), typeof(LazyResolver<>));
+
+    }
     public static void AddRepositories(this IServiceCollection services)
     {
         services.AddScoped<IUnitOfWork, UnitOfWork>();
+
+        services.AddScoped<ICourseRepository, CourseRepository>();
+        services.AddScoped<IModuleRepository, ModuleRepository>();
+        services.AddScoped<IActivityRepository, ActivityRepository>();
+        services.AddScoped<IDocumentRepository, DocumentRepository>();
+        services.AddScoped<ISubmissionRepository, SubmissionRepository>();
     }
 
     public static void AddServiceLayer(this IServiceCollection services)
@@ -89,27 +100,15 @@ public static class ServiceExtensions
         services.AddScoped<IServiceManager, ServiceManager>();
 
         services.AddScoped<IAuthService, AuthService>();
-        services.AddScoped(provider => new Lazy<IAuthService>(() => provider.GetRequiredService<IAuthService>()));
-
-        // Course Service
         services.AddScoped<ICourseService, CourseService>();
-        services.AddScoped(provider => new Lazy<ICourseService>(() => provider.GetRequiredService<ICourseService>()));
-
-        // Module Service
         services.AddScoped<IModuleService, ModuleService>();
-        services.AddScoped(provider => new Lazy<IModuleService>(() => provider.GetRequiredService<IModuleService>()));
-
-        // Activity Service
         services.AddScoped<IActivityService, ActivityService>();
-        services.AddScoped(provider => new Lazy<IActivityService>(() => provider.GetRequiredService<IActivityService>()));
-
-        // Document Service
         services.AddScoped<IDocumentService, DocumentService>();
-        services.AddScoped(provider => new Lazy<IDocumentService>(() => provider.GetRequiredService<IDocumentService>()));
-
-        // Submission Service
         services.AddScoped<ISubmissionService, SubmissionService>();
-        services.AddScoped(provider => new Lazy<ISubmissionService>(() => provider.GetRequiredService<ISubmissionService>()));
+
+        // User Service
+        services.AddScoped<IUserService, UserService>();
+        services.AddScoped(provider => new Lazy<IUserService>(() => provider.GetRequiredService<IUserService>()));
 
         services.AddScoped<IStudentCourseService, StudentCourseService>();
     }

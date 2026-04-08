@@ -25,6 +25,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Folder Include="Data\MappingResolvers\" />
     <Folder Include="Migrations\" />
   </ItemGroup>
 

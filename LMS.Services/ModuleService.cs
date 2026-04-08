@@ -1,4 +1,4 @@
-﻿using AutoMapper;
+using AutoMapper;
 using Domain.Contracts.Repositories;
 using Domain.Models.Entities;
 using Domain.Models.Exceptions;
@@ -33,15 +33,17 @@ namespace LMS.Services
             };
         }
 
-        public async Task<ModuleDto?> GetModuleByIdAsync(int id)
+        public async Task<ModuleDto> GetModuleByIdAsync(int id)
         {
-            var module = await unitOfWork.Modules.GetModuleAsync(id);
+            var module = await unitOfWork.Modules.GetModuleAsync(id)
+                ?? throw new NotFoundException($"Module with id {id} not found");
             return mapper.Map<ModuleDto>(module);
         }
 
-        public async Task<ModuleDetailDto?> GetModuleDetailByIdAsync(int id)
+        public async Task<ModuleDetailDto> GetModuleDetailByIdAsync(int id)
         {
-            var module = await unitOfWork.Modules.GetModuleAsync(id);
+            var module = await unitOfWork.Modules.GetModuleAsync(id)
+                ?? throw new NotFoundException($"Module with id {id} not found");
             return mapper.Map<ModuleDetailDto>(module);
         }
 
@@ -107,6 +109,7 @@ namespace LMS.Services
             module.Description = dto.Description;
             module.StartDate = dto.StartDate;
             module.EndDate = dto.EndDate;
+            module.Icon = dto.Icon;
 
             await ThrowIfNotValidModule(module);
 
@@ -126,6 +129,10 @@ namespace LMS.Services
             }
             module.StartDate = dto.StartDate ?? module.StartDate;
             module.EndDate = dto.EndDate ?? module.EndDate;
+            if (dto.Icon is not null)
+            {
+                module.Icon = dto.Icon;
+            }
 
             await ThrowIfNotValidModule(module.CourseId, module.Id, module.StartDate, module.EndDate, module.Name);
 

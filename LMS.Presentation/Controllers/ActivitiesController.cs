@@ -42,9 +42,6 @@ public class ActivitiesController : ControllerBase
     public async Task<IActionResult> GetActivityById(int id)
     {
         var activity = await serviceManager.ActivityService.GetActivityByIdAsync(id);
-        if (activity == null)
-            return NotFound(new { message = "Activity not found" });
-
         return Ok(activity);
     }
 
@@ -58,9 +55,6 @@ public class ActivitiesController : ControllerBase
     public async Task<IActionResult> GetActivityDetail(int id)
     {
         var activity = await serviceManager.ActivityService.GetActivityDetailByIdAsync(id);
-        if (activity == null)
-            return NotFound(new { message = "Activity not found" });
-
         return Ok(activity);
     }
 
@@ -88,6 +82,17 @@ public class ActivitiesController : ControllerBase
     {
         await serviceManager.ActivityService.UpdateActivityAsync(id, dto);
         return Ok(new { message = "Activity updated successfully" });
+    }
+
+    [HttpPatch("{id}")]
+    [SwaggerOperation(
+        Summary = "Partially update an activity.",
+        Description = "Partially updates an existing activity with the provided details"
+    )]
+    public async Task<IActionResult> PatchActivity(int id, [FromBody] PatchActivityDto dto)
+    {
+        await serviceManager.ActivityService.PatchActivityAsync(id, dto);
+        return Ok(new { message = "Activity patched successfully" });
     }
 
     [HttpDelete("{id}")]

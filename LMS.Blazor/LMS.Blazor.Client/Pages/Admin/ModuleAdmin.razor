@@ -1,0 +1,552 @@
+﻿@page "/admin/modules"
+@attribute [Authorize(Roles = "Teacher")]
+@using LMS.Shared.DTOs.Module
+@using LMS.Shared.DTOs.Course
+@inject IModuleService ModuleService
+@inject ICourseService CourseService
+@inject NavigationManager Navigation
+
+<PageTitle>Module Management</PageTitle>
+
+<div class="container-fluid py-4">
+
+    @* ---- Header ---- *@
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+        <h2 class="mb-0">Module Management</h2>
+        @if (!showForm)
+        {
+            <button class="btn btn-primary" @onclick="HandleCreateClicked">
+                <i class="bi bi-plus-lg me-1"></i> Create Module
+            </button>
+        }
+    </div>
+
+    @* ---- Feedback messages ---- *@
+    @if (!string.IsNullOrEmpty(successMessage))
+    {
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            @successMessage
+            <button type="button" class="btn-close" @onclick="() => successMessage = null"></button>
+        </div>
+    }
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            @errorMessage
+            <button type="button" class="btn-close" @onclick="() => errorMessage = null"></button>
+        </div>
+    }
+
+    @* ---- Course filter ---- *@
+    <div class="card mb-3">
+        <div class="card-body py-2">
+            <div class="row g-2 align-items-end">
+                <div class="col-12 col-md-4">
+                    <label class="form-label small fw-semibold mb-1">Filter by Course</label>
+                    <select class="form-select form-select-sm" @bind="selectedCourseId" @bind:after="OnCourseFilterChanged">
+                        <option value="0">— All Courses —</option>
+                        @foreach (var c in availableCourses)
+                        {
+                            <option value="@c.Id">@c.Name</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-auto">
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="ClearFilter">
+                        <i class="bi bi-x-lg me-1"></i>Clear
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @* ---- Inline create/edit form ---- *@
+    @if (showForm)
+    {
+        <div class="card mb-4">
+            <div class="card-header">
+                <h6 class="mb-0">@(editingModule is null ? "Create Module" : $"Edit: {editingModule.Name}")</h6>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold">Course <span class="text-danger">*</span></label>
+                        <select class="form-select @(formErrors.ContainsKey("CourseId") ? "is-invalid" : "")"
+                                @bind="formModel.CourseId"
+                                disabled="@(editingModule is not null)">
+                            <option value="0">— Select course —</option>
+                            @foreach (var c in availableCourses)
+                            {
+                                <option value="@c.Id">@c.Name</option>
+                            }
+                        </select>
+                        @if (formErrors.TryGetValue("CourseId", out var courseErr))
+                        {
+                            <div class="invalid-feedback">@courseErr</div>
+                        }
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold">Name <span class="text-danger">*</span></label>
+                        <input class="form-control @(formErrors.ContainsKey("Name") ? "is-invalid" : "")"
+                               @bind="formModel.Name"
+                               placeholder="Module name" />
+                        @if (formErrors.TryGetValue("Name", out var nameErr))
+                        {
+                            <div class="invalid-feedback">@nameErr</div>
+                        }
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold">Description</label>
+                        <input class="form-control" @bind="formModel.Description" placeholder="Optional description" />
+                    </div>
+
+                    <div class="col-md-3">
+                        <label class="form-label fw-semibold">Start Date <span class="text-danger">*</span></label>
+                        <input type="date"
+                               class="form-control @(formErrors.ContainsKey("StartDate") ? "is-invalid" : "")"
+                               @bind="formModel.StartDate" />
+                        @if (formErrors.TryGetValue("StartDate", out var startErr))
+                        {
+                            <div class="invalid-feedback">@startErr</div>
+                        }
+                    </div>
+
+                    <div class="col-md-3">
+                        <label class="form-label fw-semibold">End Date <span class="text-danger">*</span></label>
+                        <input type="date"
+                               class="form-control @(formErrors.ContainsKey("EndDate") ? "is-invalid" : "")"
+                               @bind="formModel.EndDate" />
+                        @if (formErrors.TryGetValue("EndDate", out var endErr))
+                        {
+                            <div class="invalid-feedback">@endErr</div>
+                        }
+                    </div>
+
+                    <div class="col-12 d-flex gap-2 pt-1">
+                        <button class="btn btn-success" @onclick="HandleFormSubmit" disabled="@isSubmitting">
+                            @if (isSubmitting)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1"></span>
+                            }
+                            @(editingModule is null ? "Create" : "Save Changes")
+                        </button>
+                        <button class="btn btn-secondary" @onclick="HandleFormCancel">Cancel</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    @* ---- List section ---- *@
+    @if (isLoading)
+    {
+        <div class="text-center py-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2 text-muted">Loading modules...</p>
+        </div>
+    }
+    else if (!string.IsNullOrEmpty(loadError))
+    {
+        <div class="alert alert-danger">
+            <p>@loadError</p>
+            <button class="btn btn-outline-danger btn-sm" @onclick="LoadModulesAsync">Retry</button>
+        </div>
+    }
+    else if (!modules.Any())
+    {
+        <div class="text-center py-5 text-muted">
+            <i class="bi bi-journal-x fs-1"></i>
+            <p class="mt-2">
+                No modules found.
+                @if (selectedCourseId > 0)
+                {
+                    <span>Try clearing the course filter or </span>
+                }
+                <span>create the first one.</span>
+            </p>
+        </div>
+    }
+    else
+    {
+        <div class="card">
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Module Name</th>
+                                <th class="d-none d-md-table-cell">Course</th>
+                                <th class="d-none d-sm-table-cell">Start</th>
+                                <th class="d-none d-sm-table-cell">End</th>
+                                <th class="text-center">Activities</th>
+                                <th style="width:130px;"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var module in modules)
+                            {
+                                <tr>
+                                    <td>
+                                        <div class="fw-semibold">@module.Name</div>
+                                        @if (!string.IsNullOrEmpty(module.Description))
+                                        {
+                                            <div class="text-muted small text-truncate" style="max-width:220px;">@module.Description</div>
+                                        }
+                                    </td>
+                                    <td class="d-none d-md-table-cell">
+                                        <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25">
+                                            @module.CourseName
+                                        </span>
+                                    </td>
+                                    <td class="d-none d-sm-table-cell text-muted small">@module.StartDate.ToString("yyyy-MM-dd")</td>
+                                    <td class="d-none d-sm-table-cell text-muted small">@module.EndDate.ToString("yyyy-MM-dd")</td>
+                                    <td class="text-center">
+                                        <span class="badge bg-secondary">@module.ActivityCount</span>
+                                    </td>
+                                    <td class="text-end text-nowrap">
+                                        <button class="btn btn-sm btn-outline-primary me-1"
+                                                title="View Details"
+                                                @onclick="() => HandleDetailsClicked(module)">
+                                            <i class="bi bi-eye"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary me-1"
+                                                title="Edit"
+                                                @onclick="() => HandleEditClicked(module)">
+                                            <i class="bi bi-pencil"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-danger"
+                                                title="Delete"
+                                                @onclick="() => HandleDeleteClicked(module)">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        @* ---- Pagination ---- *@
+        @if (totalPages > 1)
+        {
+            <nav class="mt-3">
+                <ul class="pagination justify-content-center flex-wrap">
+                    <li class="page-item @(currentPage == 1 ? "disabled" : "")">
+                        <button class="page-link" @onclick="() => GoToPageAsync(currentPage - 1)">Previous</button>
+                    </li>
+                    @for (int i = 1; i <= totalPages; i++)
+                    {
+                        var pageNum = i;
+                        <li class="page-item @(currentPage == pageNum ? "active" : "")">
+                            <button class="page-link" @onclick="() => GoToPageAsync(pageNum)">@pageNum</button>
+                        </li>
+                    }
+                    <li class="page-item @(currentPage == totalPages ? "disabled" : "")">
+                        <button class="page-link" @onclick="() => GoToPageAsync(currentPage + 1)">Next</button>
+                    </li>
+                </ul>
+            </nav>
+        }
+    }
+</div>
+
+@* ---- Delete confirmation modal ---- *@
+@if (showDeleteConfirm && moduleToDelete is not null)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background:rgba(0,0,0,0.5)">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Confirm Delete</h5>
+                </div>
+                <div class="modal-body">
+                    Are you sure you want to delete <strong>@moduleToDelete.Name</strong>?
+                    This will also remove all activities within this module and cannot be undone.
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="CancelDelete">Cancel</button>
+                    <button class="btn btn-danger" @onclick="ConfirmDeleteAsync" disabled="@isDeleting">
+                        @if (isDeleting)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"></span>
+                        }
+                        Delete
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    // ---- Query param support: /admin/modules?courseId=3 ----
+    [SupplyParameterFromQuery] public int? CourseId { get; set; }
+
+    // ---- List state ----
+    private List<ModuleDto> modules = [];
+    private List<CourseDto> availableCourses = [];
+    private bool isLoading;
+    private string? loadError;
+
+    // ---- Filter ----
+    private int selectedCourseId = 0;
+
+    // ---- Pagination ----
+    private int currentPage = 1;
+    private int pageSize = 10;
+    private int totalPages = 0;
+
+    // ---- Feedback ----
+    private string? successMessage;
+    private string? errorMessage;
+
+    // ---- Form state ----
+    private bool showForm;
+    private bool isSubmitting;
+    private ModuleDto? editingModule;
+    private ModuleFormModel formModel = new();
+    private Dictionary<string, string> formErrors = new();
+
+    // ---- Delete state ----
+    private bool showDeleteConfirm;
+    private bool isDeleting;
+    private ModuleDto? moduleToDelete;
+
+    // ---- Lifecycle ----
+    protected override async Task OnInitializedAsync()
+    {
+        // Respect optional ?courseId= query param
+        if (CourseId is > 0)
+            selectedCourseId = CourseId.Value;
+
+        await Task.WhenAll(LoadCoursesAsync(), LoadModulesAsync());
+    }
+
+    // ---- Data loading ----
+    private async Task LoadModulesAsync()
+    {
+        isLoading = true;
+        loadError = null;
+        StateHasChanged();
+
+        try
+        {
+            var courseFilter = selectedCourseId > 0 ? selectedCourseId : (int?)null;
+            var result = await ModuleService.GetAllModulesAsync(currentPage, pageSize, courseFilter);
+            if (result is not null)
+            {
+                modules = result.Items;
+                totalPages = result.TotalPages;
+            }
+        }
+        catch (Exception ex)
+        {
+            loadError = $"Failed to load modules. {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task LoadCoursesAsync()
+    {
+        try
+        {
+            var result = await CourseService.GetAllCoursesAsync(1, 100);
+            if (result is not null)
+                availableCourses = result.Items;
+        }
+        catch
+        {
+            // Non-critical — filter just won't populate
+        }
+    }
+
+    // ---- Filter ----
+    private async Task OnCourseFilterChanged()
+    {
+        currentPage = 1;
+        await LoadModulesAsync();
+    }
+
+    private async Task ClearFilter()
+    {
+        selectedCourseId = 0;
+        currentPage = 1;
+        await LoadModulesAsync();
+    }
+
+    // ---- Pagination ----
+    private async Task GoToPageAsync(int page)
+    {
+        currentPage = page;
+        await LoadModulesAsync();
+    }
+
+    // ---- Navigation ----
+    private void HandleDetailsClicked(ModuleDto module)
+        => Navigation.NavigateTo($"/admin/modules/{module.Id}/details");
+
+    // ---- Form handling ----
+    private void HandleCreateClicked()
+    {
+        editingModule = null;
+        formModel = new ModuleFormModel
+        {
+            CourseId = selectedCourseId > 0 ? selectedCourseId : 0,
+            StartDate = DateTime.Today,
+            EndDate = DateTime.Today.AddDays(14)
+        };
+        formErrors = new();
+        showForm = true;
+    }
+
+    private void HandleEditClicked(ModuleDto module)
+    {
+        editingModule = module;
+        formModel = new ModuleFormModel
+        {
+            CourseId = module.CourseId,
+            Name = module.Name,
+            Description = module.Description,
+            StartDate = module.StartDate,
+            EndDate = module.EndDate
+        };
+        formErrors = new();
+        showForm = true;
+    }
+
+    private async Task HandleFormSubmit()
+    {
+        formErrors = ValidateForm();
+        if (formErrors.Any()) return;
+
+        isSubmitting = true;
+        try
+        {
+            if (editingModule is null)
+            {
+                // Create
+                var dto = new CreateModuleDto
+                {
+                    CourseId = formModel.CourseId,
+                    Name = formModel.Name,
+                    Description = formModel.Description,
+                    StartDate = formModel.StartDate,
+                    EndDate = formModel.EndDate
+                };
+
+                var created = await ModuleService.CreateModuleAsync(dto);
+                if (created is not null)
+                {
+                    successMessage = $"Module '{created.Name}' created successfully.";
+                    showForm = false;
+                    await LoadModulesAsync();
+                }
+                else
+                {
+                    errorMessage = "Failed to create module. Please try again.";
+                }
+            }
+            else
+            {
+                // Edit — uses UpdateModuleDto via a PUT (not yet in IModuleService client interface,
+                // so we reload and show a note for now)
+                // TODO: add UpdateModuleAsync to IModuleService and call it here
+                successMessage = $"(Edit not yet wired to API) Module '{formModel.Name}' — save pending.";
+                showForm = false;
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+    private void HandleFormCancel()
+    {
+        showForm = false;
+        editingModule = null;
+        formErrors = new();
+    }
+
+    // ---- Delete ----
+    private void HandleDeleteClicked(ModuleDto module)
+    {
+        moduleToDelete = module;
+        showDeleteConfirm = true;
+    }
+
+    private void CancelDelete()
+    {
+        moduleToDelete = null;
+        showDeleteConfirm = false;
+    }
+
+    private async Task ConfirmDeleteAsync()
+    {
+        if (moduleToDelete is null) return;
+
+        isDeleting = true;
+        try
+        {
+            await ModuleService.DeleteModuleAsync(moduleToDelete.Id);
+            successMessage = $"Module '{moduleToDelete.Name}' deleted successfully.";
+            moduleToDelete = null;
+            showDeleteConfirm = false;
+            await LoadModulesAsync();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to delete module. {ex.Message}";
+            showDeleteConfirm = false;
+        }
+        finally
+        {
+            isDeleting = false;
+        }
+    }
+
+    // ---- Validation ----
+    private Dictionary<string, string> ValidateForm()
+    {
+        var errors = new Dictionary<string, string>();
+
+        if (formModel.CourseId <= 0)
+            errors["CourseId"] = "Please select a course.";
+
+        if (string.IsNullOrWhiteSpace(formModel.Name))
+            errors["Name"] = "Name is required.";
+
+        if (formModel.StartDate == default)
+            errors["StartDate"] = "Start date is required.";
+
+        if (formModel.EndDate == default)
+            errors["EndDate"] = "End date is required.";
+        else if (formModel.EndDate <= formModel.StartDate)
+            errors["EndDate"] = "End date must be after start date.";
+
+        return errors;
+    }
+
+    // ---- Local model ----
+    private class ModuleFormModel
+    {
+        public int CourseId { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public DateTime StartDate { get; set; } = DateTime.Today;
+        public DateTime EndDate { get; set; } = DateTime.Today.AddDays(14);
+    }
+}

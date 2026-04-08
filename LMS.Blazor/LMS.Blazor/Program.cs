@@ -7,6 +7,7 @@ using LMS.Blazor.Services;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using System.Net.Http.Headers;
+using BlazorBlueprint.Components;
 
 namespace LMS.Blazor;
 
@@ -22,6 +23,8 @@ public class Program
         builder.Services.AddRazorComponents()
             .AddInteractiveWebAssemblyComponents()
             .AddAuthenticationStateSerialization();
+
+        builder.Services.AddBlazorBlueprintComponents();
 
         builder.Services.AddControllers();
 
@@ -49,6 +52,7 @@ public class Program
                 // options.SignIn.RequireConfirmedAccount = true;
                 options.Stores.SchemaVersion = IdentitySchemaVersions.Version3;
             })
+            .AddRoles<IdentityRole>()
             .AddEntityFrameworkStores<ApplicationDbContext>()
             .AddSignInManager()
             .AddDefaultTokenProviders();
@@ -71,6 +75,8 @@ public class Program
         //  builder.Services.AddScoped<IApiService, ClientApiService>();
         builder.Services.AddScoped<IApiService, ServerNoOpApiService>();
         builder.Services.AddScoped<ICourseService, ServerNoOpCourseService>();
+        builder.Services.AddScoped<IModuleService, ServerNoOpModuleService>();
+        builder.Services.AddScoped<IActivityService, ServerNoOpActivityService>();
 
         var app = builder.Build();
 

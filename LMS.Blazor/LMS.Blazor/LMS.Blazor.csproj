@@ -9,6 +9,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="BlazorBlueprint.Components" Version="3.7.3" />
     <ProjectReference Include="..\..\Domain.Models\Domain.Models.csproj" />
     <ProjectReference Include="..\LMS.Blazor.Client\LMS.Blazor.Client.csproj" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="10.0.3" />

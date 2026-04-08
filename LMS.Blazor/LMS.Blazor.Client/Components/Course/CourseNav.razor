@@ -1,0 +1,55 @@
+<div class="course-nav">
+    <div class="course-header">2024 HT</div>
+    
+    <nav class="course-menu">
+        <a href="/" class="menu-item">Home</a>
+        <a href="/syllabus" class="menu-item">Syllabus</a>
+        <a href="/modules" class="menu-item active">Modules</a>
+        <a href="/announcements" class="menu-item">Announcements</a>
+        <a href="/people" class="menu-item">People</a>
+        <a href="/assignments" class="menu-item">Assignments</a>
+        <a href="/grades" class="menu-item">Grades</a>
+    </nav>
+</div>
+
+<style>
+    .course-nav {
+        padding: 0;
+        width: 100%;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    .course-header {
+        font-style: italic;
+        font-size: 0.9rem;
+        color: #666;
+        margin-bottom: 25px;
+        padding-left: 15px;
+    }
+
+    .course-menu {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .menu-item {
+        text-decoration: none;
+        color: #0066cc; /* Canvas blue */
+        font-size: 1.1rem;
+        padding: 5px 0 5px 15px;
+        transition: color 0.2s;
+        border-left: 2px solid transparent;
+        display: block;
+    }
+
+    .menu-item:hover {
+        text-decoration: underline;
+    }
+
+    .menu-item.active {
+        color: #333;
+        font-weight: 600;
+        border-left: 2px solid #333;
+    }
+</style>

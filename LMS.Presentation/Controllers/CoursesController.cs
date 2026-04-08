@@ -39,9 +39,6 @@ public class CoursesController : ControllerBase
     public async Task<IActionResult> GetCourseById(int id)
     {
         var course = await serviceManager.CourseService.GetCourseByIdAsync(id);
-        if (course == null)
-            return NotFound(new { message = "Course not found" });
-
         return Ok(course);
     }
 
@@ -55,9 +52,6 @@ public class CoursesController : ControllerBase
     public async Task<IActionResult> GetCourseDetail(int id)
     {
         var course = await serviceManager.CourseService.GetCourseDetailByIdAsync(id);
-        if (course == null)
-            return NotFound(new { message = "Course not found" });
-
         return Ok(course);
     }
 

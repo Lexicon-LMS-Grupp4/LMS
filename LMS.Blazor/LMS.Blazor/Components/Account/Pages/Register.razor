@@ -84,6 +84,8 @@
             identityErrors = result.Errors;
             return;
         }
+        // Assign Student role to every self-registered user
+        await UserManager.AddToRoleAsync(user, "Student");
 
         Logger.LogInformation("User created a new account with password.");
 

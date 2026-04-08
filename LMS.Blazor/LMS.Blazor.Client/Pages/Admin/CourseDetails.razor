@@ -1,0 +1,731 @@
+﻿@page "/admin/courses/{CourseId:int}/details"
+@attribute [Authorize(Roles = "Teacher")]
+@using LMS.Shared.DTOs.Activity
+@using LMS.Shared.DTOs.Course
+@using LMS.Shared.DTOs.Module
+@using LMS.Shared.DTOs.User
+@inject ICourseService CourseService
+@inject NavigationManager Navigation
+@using Domain.Models.Enums
+@inject IModuleService ModuleService
+@inject IActivityService ActivityService
+@inject IUserService UserService
+
+<PageTitle>Course Details</PageTitle>
+
+<div class="container-fluid py-4">
+
+    @* ---- Header ---- *@
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+        <h2 class="mb-0">Course Details</h2>
+        <button class="btn btn-outline-secondary" title="Back to Courses" @onclick="GoBack">
+            <i class="bi bi-arrow-left"></i>
+            <span class="d-none d-md-inline ms-1">Back to Courses</span>
+        </button>
+    </div>
+
+    @* ---- Feedback ---- *@
+    @if (!string.IsNullOrEmpty(successMessage))
+    {
+        <div class="alert alert-success alert-dismissible">
+            @successMessage
+            <button type="button" class="btn-close" @onclick="() => successMessage = null"></button>
+        </div>
+    }
+
+    @if (isLoading)
+    {
+        <div class="text-center py-5">
+            <div class="spinner-border text-primary" role="status"></div>
+            <p class="mt-2 text-muted">Loading course details...</p>
+        </div>
+    }
+    else if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger">
+            <p>@errorMessage</p>
+            <button class="btn btn-outline-danger btn-sm" @onclick="LoadCourseAsync">Retry</button>
+        </div>
+    }
+    else if (course is null)
+    {
+        <div class="alert alert-warning">Course not found.</div>
+    }
+    else
+    {
+        @* ---- Course Info ---- *@
+        <div class="card mb-4">
+            <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+                <h5 class="mb-0">@course.Name</h5>
+                <div class="d-flex gap-2 flex-wrap">
+                    <span class="badge bg-primary">@modules.Count Modules</span>
+                    <span class="badge bg-success">@students.Count Students</span>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <p class="text-muted mb-1 small">Description</p>
+                        <p>@course.Description</p>
+                    </div>
+                    <div class="col-md-3">
+                        <p class="text-muted mb-1 small">Start Date</p>
+                        <p>@course.StartDate.ToString("yyyy-MM-dd")</p>
+                    </div>
+                    <div class="col-md-3">
+                        <p class="text-muted mb-1 small">Teachers</p>
+                        <p>@(course.TeacherIds.Any() ? string.Join(", ", course.TeacherIds) : "None assigned")</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @* ==============================
+           MODULES SECTION
+           ============================== *@
+        <div class="card mb-4">
+            <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+                <h6 class="mb-0"><i class="bi bi-journal-text me-2"></i>Modules</h6>
+                <button class="btn btn-sm btn-primary" title="Add Module" @onclick="() => showAddModule = !showAddModule">
+                    <i class="bi bi-plus-lg"></i>
+                    <span class="d-none d-md-inline ms-1">Add Module</span>
+                </button>
+            </div>
+
+            @* ---- Add Module Panel ---- *@
+            @if (showAddModule)
+            {
+                <div class="card-body border-bottom bg-light">
+                    <div class="row g-2 align-items-end">
+                        <div class="col-md-3">
+                            <label class="form-label small fw-semibold">Name *</label>
+                            <input class="form-control form-control-sm" @bind="newModule.Name" placeholder="Module name" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small fw-semibold">Description</label>
+                            <input class="form-control form-control-sm" @bind="newModule.Description" placeholder="Description" />
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label small fw-semibold">Start Date *</label>
+                            <input type="date" class="form-control form-control-sm" @bind="newModule.StartDate" />
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label small fw-semibold">End Date</label>
+                            <input type="date" class="form-control form-control-sm" @bind="newModule.EndDate" />
+                        </div>
+                        <div class="col-12 col-md-2 d-flex gap-1">
+                            <button class="btn btn-sm btn-success w-100" @onclick="AddModuleAsync">Save</button>
+                            <button class="btn btn-sm btn-secondary" @onclick="() => showAddModule = false">✕</button>
+                        </div>
+                    </div>
+                    @if (!string.IsNullOrEmpty(moduleError))
+                    {
+                        <p class="text-danger small mt-1 mb-0">@moduleError</p>
+                    }
+                </div>
+            }
+
+            <div class="card-body p-0">
+                @if (!modules.Any())
+                {
+                    <p class="text-muted p-3 mb-0">No modules yet. Add the first one.</p>
+                }
+                else
+                {
+                    @foreach (var module in modules)
+                    {
+                        <div class="border-bottom">
+                            @* Module row *@
+                            <div class="d-flex justify-content-between align-items-center gap-2 px-3 py-2">
+                                <div class="flex-grow-1 overflow-hidden">
+                                    <div class="fw-semibold text-truncate">@module.Name</div>
+                                    <div class="text-muted small mt-1">@module.StartDate.ToString("yyyy-MM-dd") → @module.EndDate.ToString("yyyy-MM-dd")</div>
+                                    <div class="mt-1">
+                                        <div class="d-flex justify-content-between align-items-center gap-2">
+                                            <span class="badge bg-secondary" style="font-size:0.7rem;">@module.ActivityCount activities</span>
+                                            <div class="d-flex gap-1 flex-shrink-0">
+                                                <button class="btn btn-sm btn-outline-primary"
+                                                        title="Toggle Activities"
+                                                        @onclick="() => ToggleActivitiesAsync(module.Id)">
+                                                    <i class="bi bi-list-ul"></i>
+                                                    <span class="d-none d-md-inline ms-1">Activities</span>
+                                                </button>
+                                                <button class="btn btn-sm btn-outline-danger"
+                                                        title="Remove Module"
+                                                        @onclick="() => RemoveModuleAsync(module.Id)">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            @* Activities sub-panel *@
+                            @if (expandedModuleId == module.Id)
+                            {
+                                <div class="bg-light px-4 py-3">
+
+                                    @* Add Activity inline *@
+                                    <div class="row g-2 align-items-end mb-3">
+                                        <div class="col-12 col-sm-6 col-xl-3">
+                                            <label class="form-label small fw-semibold mb-1">Activity Name</label>
+                                            <input class="form-control form-control-sm"
+                                                   @bind="newActivityName" placeholder="e.g. Lecture 1" />
+                                        </div>
+                                        <div class="col-12 col-sm-6 col-xl-2">
+                                            <label class="form-label small fw-semibold mb-1">Type</label>
+                                            <select class="form-select form-select-sm" @bind="newActivityType">
+                                                @foreach (var type in Enum.GetValues<ActivityType>())
+                                                {
+                                                    <option value="@type">@type</option>
+                                                }
+                                            </select>
+                                        </div>
+                                        <div class="col-12 col-sm-6 col-xl-3">
+                                            <label class="form-label small fw-semibold mb-1">Start</label>
+                                            <input type="datetime-local" class="form-control form-control-sm"
+                                                   @bind="newActivityStart" />
+                                        </div>
+                                        <div class="col-12 col-sm-6 col-xl-3">
+                                            <label class="form-label small fw-semibold mb-1">End</label>
+                                            <input type="datetime-local" class="form-control form-control-sm"
+                                                   @bind="newActivityEnd" />
+                                        </div>
+                                        <div class="col-12 col-xl-1 d-flex gap-1">
+                                            <button class="btn btn-sm btn-primary flex-fill"
+                                                    title="Add Activity"
+                                                    @onclick="() => AddActivityAsync(module.Id, ActivityKind.Activity)">
+                                                <i class="bi bi-plus-lg"></i>
+                                                <span class="d-none d-xl-inline ms-1">Activity</span>
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-primary flex-fill"
+                                                    title="Add Assignment"
+                                                    @onclick="() => AddActivityAsync(module.Id, ActivityKind.Assignment)">
+                                                <i class="bi bi-plus-lg"></i>
+                                                <span class="d-none d-xl-inline ms-1">Assignment</span>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    @* Activity list *@
+                                    @{
+                                        var acts = moduleActivities.TryGetValue(module.Id, out var list) ? list : [];
+                                    }
+                                    @if (!acts.Any())
+                                    {
+                                        <p class="text-muted small mb-0">No activities yet.</p>
+                                    }
+                                    else
+                                    {
+                                        <div class="table-responsive">
+                                            <table class="table table-sm table-bordered mb-0 bg-white">
+                                                <thead class="table-light">
+                                                    <tr>
+                                                        <th>Name</th>
+                                                        <th>Type</th>
+                                                        <th>Start</th>
+                                                        <th>End</th>
+                                                        <th></th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    @foreach (var act in acts)
+                                                    {
+                                                        <tr>
+                                                            <td>@act.Name</td>
+                                                            <td><span class="badge bg-info text-dark">@act.Type</span></td>
+                                                            <td>@act.StartTime.ToString("yyyy-MM-dd HH:mm")</td>
+                                                            <td>@act.EndTime.ToString("yyyy-MM-dd HH:mm")</td>
+                                                            <td>
+                                                                <button class="btn btn-sm btn-outline-danger"
+                                                                        @onclick="() => RemoveActivityAsync(act.Id, module.Id)">
+                                                                    <i class="bi bi-trash"></i>
+                                                                </button>
+                                                            </td>
+                                                        </tr>
+                                                    }
+                                                </tbody>
+                                            </table>
+                                        </div>
+
+                                        @* Sync reminder *@
+                                        <div class="alert alert-warning py-1 px-2 mt-2 mb-0 small">
+                                            <i class="bi bi-exclamation-triangle me-1"></i>
+                                            These activities are stored locally. Save to API when backend is ready.
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+
+        @* ==============================
+           STUDENTS SECTION
+           ============================== *@
+        <div class="card mb-4">
+            <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+                <h6 class="mb-0"><i class="bi bi-people me-2"></i>Students</h6>
+                <button class="btn btn-sm btn-primary" title="Enroll Student" @onclick="() => showEnrollStudent = !showEnrollStudent">
+                    <i class="bi bi-person-plus"></i>
+                    <span class="d-none d-md-inline ms-1">Enroll Student</span>
+                </button>
+            </div>
+
+            @* ---- Enroll Panel ---- *@
+            @if (showEnrollStudent)
+            {
+                <div class="card-body border-bottom bg-light">
+                    <div class="row g-2 align-items-end">
+                        <div class="col-12 col-md-6">
+                            <label class="form-label small fw-semibold">Select Student</label>
+                            <select class="form-select form-select-sm" @bind="selectedStudentId">
+                                <option value="">-- pick a student --</option>
+                                @foreach (var s in availableStudents.Where(s => !students.Any(e => e.Id == s.Id)))
+                                {
+                                    <option value="@s.Id">@s.Name (@s.Email)</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-12 col-md-auto d-flex gap-1">
+                            <button class="btn btn-sm btn-success" @onclick="EnrollStudentAsync">Enroll</button>
+                            <button class="btn btn-sm btn-secondary" @onclick="() => showEnrollStudent = false">✕</button>
+                        </div>
+                    </div>
+                    @if (!string.IsNullOrEmpty(studentError))
+                    {
+                        <p class="text-danger small mt-1 mb-0">@studentError</p>
+                    }
+                </div>
+            }
+
+            <div class="card-body p-0">
+                @if (!students.Any())
+                {
+                    <p class="text-muted p-3 mb-0">No students enrolled yet.</p>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Username</th>
+                                    <th class="d-none d-sm-table-cell">Email</th>
+                                    <th style="width:48px;"></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var student in students)
+                                {
+                                    <tr>
+                                        <td class="text-truncate" style="max-width:150px;">@student.Name</td>
+                                        <td class="d-none d-sm-table-cell text-truncate" style="max-width:200px;">@student.Email</td>
+                                        <td class="text-end text-nowrap">
+                                            <button class="btn btn-sm btn-outline-danger"
+                                                    title="Remove Student"
+                                                    @onclick="() => RemoveStudentAsync(student.Id)">
+                                                <i class="bi bi-person-dash"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+
+        @* ==============================
+           DOCUMENTS SECTION
+           ============================== *@
+        <div class="card mb-4">
+            <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+                <h6 class="mb-0"><i class="bi bi-file-earmark me-2"></i>Documents</h6>
+                <button class="btn btn-sm btn-primary" title="Upload Document" @onclick="() => showUploadDocument = !showUploadDocument">
+                    <i class="bi bi-upload"></i>
+                    <span class="d-none d-md-inline ms-1">Upload Document</span>
+                </button>
+            </div>
+
+            @* ---- Upload Panel ---- *@
+            @if (showUploadDocument)
+            {
+                <div class="card-body border-bottom bg-light">
+                    <div class="row g-2 align-items-end">
+                        <div class="col-12 col-md-5">
+                            <label class="form-label small fw-semibold">Display Name *</label>
+                            <input class="form-control form-control-sm" @bind="newDocName" placeholder="e.g. Lecture Slides Week 1" />
+                        </div>
+                        <div class="col-12 col-md-5">
+                            <label class="form-label small fw-semibold">File (mock)</label>
+                            <input type="file" class="form-control form-control-sm" @onchange="HandleFilePicked" />
+                        </div>
+                        <div class="col-12 col-md-auto d-flex gap-1">
+                            <button class="btn btn-sm btn-success" @onclick="AddDocument">Add</button>
+                            <button class="btn btn-sm btn-secondary" @onclick="() => showUploadDocument = false">✕</button>
+                        </div>
+                    </div>
+                    @if (!string.IsNullOrEmpty(documentError))
+                    {
+                        <p class="text-danger small mt-1 mb-0">@documentError</p>
+                    }
+                </div>
+            }
+
+            <div class="card-body">
+                <div class="alert alert-info mb-0">
+                    <i class="bi bi-info-circle me-2"></i>
+                    Document upload requires authentication context and is not yet available.
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public int CourseId { get; set; }
+
+    // ---- API state ----
+    private CourseDto? course;
+    private bool isLoading;
+    private string? errorMessage;
+    private string? successMessage;
+
+    // ---- Module state ----
+    private List<ModuleDto> modules = [];
+    private List<StudentBasicDto> students = [];
+    private bool showAddModule;
+    private string? moduleError;
+    private int? expandedModuleId;
+    private NewModuleModel newModule = new();
+    private bool isAddingModule;
+    private Dictionary<int, List<ActivityDto>> moduleActivities = new();
+
+    // ---- Activity state ----
+    private string newActivityName = string.Empty;
+    private ActivityType newActivityType = ActivityType.Lecture;
+    private DateTime newActivityStart = DateTime.Today.AddHours(9);
+    private DateTime newActivityEnd = DateTime.Today.AddHours(17);
+    private bool isAddingActivity;
+    private string? activityError;
+
+    // ---- Student state ----
+    private List<StudentBasicDto> availableStudents = [];
+    private bool showEnrollStudent;
+    private string selectedStudentId = string.Empty;
+    private string? studentError;
+
+    // ---- Document state ----
+    private bool showUploadDocument;
+    private string newDocName = string.Empty;
+    private string pickedFileName = string.Empty;
+    private string? documentError;
+
+    // ---- Lifecycle ----
+    protected override async Task OnInitializedAsync()
+        => await LoadCourseAsync();
+
+    private async Task LoadCourseAsync()
+    {
+        isLoading = true;
+        errorMessage = null;
+        StateHasChanged();
+
+        try
+        {
+            var detail = await CourseService.GetCourseDetailByIdAsync(CourseId);
+
+            if (detail is not null)
+            {
+                course = detail;
+                modules = detail.Modules;
+                students = detail.Students;
+            }
+
+            var result = await UserService.GetUsersWithoutCourseAsync();
+            availableStudents = result?.Items
+                .Select(u => new StudentBasicDto
+                {
+                    Id = u.Id,
+                    Name = u.Name,
+                    Email = u.Email,
+                    CourseId = u.CourseId,
+                    CourseName = u.CourseName
+                })
+                .ToList() ?? [];
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to load course. {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    // ---- Module actions ----
+    private async Task AddModuleAsync()
+    {
+        moduleError = null;
+
+        if (string.IsNullOrWhiteSpace(newModule.Name))
+        {
+            moduleError = "Name is required.";
+            return;
+        }
+        if (newModule.EndDate is null || newModule.EndDate <= newModule.StartDate)
+        {
+            moduleError = "End date must be after start date.";
+            return;
+        }
+
+        isAddingModule = true;
+        try
+        {
+            var dto = new CreateModuleDto
+            {
+                CourseId = CourseId,
+                Name = newModule.Name,
+                Description = newModule.Description,
+                StartDate = newModule.StartDate,
+                EndDate = newModule.EndDate.Value
+            };
+
+            var created = await ModuleService.CreateModuleAsync(dto);
+            if (created is not null)
+            {
+                modules.Add(created);
+                successMessage = $"Module '{created.Name}' created.";
+                newModule = new();
+                showAddModule = false;
+            }
+            else
+            {
+                moduleError = "Failed to create module. Please try again.";
+            }
+        }
+        catch (Exception ex)
+        {
+            moduleError = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            isAddingModule = false;
+        }
+    }
+
+    private async Task RemoveModuleAsync(int moduleId)
+    {
+        await ModuleService.DeleteModuleAsync(moduleId);
+        modules.RemoveAll(m => m.Id == moduleId);
+        if (expandedModuleId == moduleId) expandedModuleId = null;
+        successMessage = "Module removed.";
+    }
+
+    private async Task ToggleActivitiesAsync(int moduleId)
+    {
+        if (expandedModuleId == moduleId)
+        {
+            expandedModuleId = null;
+            return;
+        }
+
+        expandedModuleId = moduleId;
+
+        if (!moduleActivities.ContainsKey(moduleId))
+        {
+            var result = await ActivityService.GetAllActivitiesAsync(moduleId: moduleId);
+            moduleActivities[moduleId] = result?.Items ?? [];
+        }
+    }
+
+    // ---- Activity actions ----
+    private async Task AddActivityAsync(int moduleId, ActivityKind kind)
+    {
+        activityError = null;
+
+        if (string.IsNullOrWhiteSpace(newActivityName))
+        {
+            activityError = "Activity name is required.";
+            return;
+        }
+
+        var type = kind == ActivityKind.Assignment
+            ? ActivityType.Assignment
+            : newActivityType;
+
+        isAddingActivity = true;
+        try
+        {
+            var dto = new CreateActivityDto
+            {
+                ModuleId = moduleId,
+                Name = newActivityName,
+                Description = string.Empty,
+                Type = type,
+                StartTime = newActivityStart,
+                EndTime = newActivityEnd
+            };
+
+            var created = await ActivityService.CreateActivityAsync(dto);
+            if (created is not null)
+            {
+                if (moduleActivities.TryGetValue(moduleId, out var list))
+                    list.Add(created);
+
+                var mod = modules.FirstOrDefault(m => m.Id == moduleId);
+                if (mod is not null)
+                    modules[modules.IndexOf(mod)] = mod with { ActivityCount = mod.ActivityCount + 1 };
+
+                successMessage = $"Activity '{created.Name}' created.";
+                newActivityName = string.Empty;
+            }
+            else
+            {
+                activityError = "Failed to create activity. Please try again.";
+            }
+        }
+        catch (Exception ex)
+        {
+            activityError = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            isAddingActivity = false;
+        }
+    }
+
+    private async Task RemoveActivityAsync(int activityId, int moduleId)
+    {
+        await ActivityService.DeleteActivityAsync(activityId);
+
+        if (moduleActivities.TryGetValue(moduleId, out var list))
+            list.RemoveAll(a => a.Id == activityId);
+
+        var mod = modules.FirstOrDefault(m => m.Id == moduleId);
+        if (mod is not null)
+            modules[modules.IndexOf(mod)] = mod with { ActivityCount = Math.Max(0, mod.ActivityCount - 1) };
+
+        successMessage = "Activity removed.";
+    }
+
+    // ---- Student actions ----
+    private async Task EnrollStudentAsync()
+    {
+        studentError = null;
+
+        if (string.IsNullOrWhiteSpace(selectedStudentId))
+        {
+            studentError = "Please select a student.";
+            return;
+        }
+
+        try
+        {
+            var success = await UserService.EnrollUserInCourseAsync(selectedStudentId, CourseId);
+
+            await RefreshStudentsAsync();
+
+            if (!success)
+            {
+                if (!students.Any(s => s.Id == selectedStudentId))
+                {
+                    studentError = "Failed to enroll student.";
+                    return;
+                }
+            }
+
+            selectedStudentId = string.Empty;
+            showEnrollStudent = false;
+            successMessage = "Student enrolled successfully.";
+        }
+        catch (Exception ex)
+        {
+            studentError = $"Error: {ex.Message}";
+        }
+    }
+
+    private async Task RemoveStudentAsync(string studentId)
+    {
+        studentError = null;
+
+        try
+        {
+            var success = await UserService.RemoveUserFromCourseAsync(studentId);
+
+            await RefreshStudentsAsync();
+
+            if (!success)
+            {
+                if (students.Any(s => s.Id == studentId))
+                {
+                    studentError = "Failed to remove student from course.";
+                    return;
+                }
+            }
+
+            successMessage = "Student removed from course.";
+        }
+        catch (Exception ex)
+        {
+            studentError = $"Error: {ex.Message}";
+        }
+    }
+
+    private async Task RefreshStudentsAsync()
+    {
+        var enrolled = await UserService.GetUsersByCourseAsync(CourseId);
+        students = enrolled?
+            .Select(s => new StudentBasicDto
+            {
+                Id = s.Id,
+                Name = s.Name,
+                Email = s.Email,
+                CourseId = CourseId,
+                CourseName = course?.Name
+            })
+            .ToList() ?? [];
+
+        var result = await UserService.GetUsersWithoutCourseAsync();
+        availableStudents = result?.Items
+            .Select(u => new StudentBasicDto
+            {
+                Id = u.Id,
+                Name = u.Name,
+                Email = u.Email,
+                CourseId = u.CourseId,
+                CourseName = u.CourseName
+            })
+            .ToList() ?? [];
+
+        StateHasChanged();
+    }
+
+    // ---- Document actions ----
+    private void HandleFilePicked(ChangeEventArgs e)
+        => pickedFileName = e.Value?.ToString() ?? string.Empty;
+
+    private void AddDocument()
+    {
+        documentError = "Document upload requires backend auth context — not yet wired up.";
+    }
+
+    private void GoBack() => Navigation.NavigateTo("/admin/courses");
+
+    // ---- Local models ----
+    private class NewModuleModel
+    {
+        public string Name { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public DateTime StartDate { get; set; } = DateTime.Today;
+        public DateTime? EndDate { get; set; } = DateTime.Today.AddDays(14);
+    }
+
+    private enum ActivityKind { Activity, Assignment }
+}

@@ -66,8 +66,19 @@ public class ClientApiService : IApiService
         }
     }
 
+    //private async Task<T?> DeserializeAsync<T>(HttpResponseMessage response, CancellationToken ct)
+    //{
+    //    return await JsonSerializer.DeserializeAsync<T>(await response.Content.ReadAsStreamAsync(ct), _jsonOptions, ct);
+    //}
     private async Task<T?> DeserializeAsync<T>(HttpResponseMessage response, CancellationToken ct)
     {
-        return await JsonSerializer.DeserializeAsync<T>(await response.Content.ReadAsStreamAsync(ct), _jsonOptions, ct);
+        if (response.StatusCode == System.Net.HttpStatusCode.NoContent)
+            return default;
+
+        var content = await response.Content.ReadAsStreamAsync(ct);
+        if (content.Length == 0)
+            return default;
+
+        return await JsonSerializer.DeserializeAsync<T>(content, _jsonOptions, ct);
     }
 }

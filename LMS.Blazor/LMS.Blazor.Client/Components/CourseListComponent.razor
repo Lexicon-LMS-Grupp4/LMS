@@ -5,30 +5,36 @@
         <thead class="table-dark">
             <tr>
                 <th>Name</th>
-                <th>Description</th>
-                <th>Start Date</th>
+                <th class="d-none d-md-table-cell">Description</th>
+                <th class="d-none d-sm-table-cell">Start Date</th>
                 <th class="text-center">Actions</th>
             </tr>
         </thead>
         <tbody>
             @foreach (var course in Courses)
             {
-                <tr>
+                <tr style="cursor:pointer;" @onclick="() => OnDetails.InvokeAsync(course)">
                     <td>@course.Name</td>
-                    <td class="text-truncate" style="max-width: 300px;">@course.Description</td>
-                    <td>@course.StartDate.ToString("yyyy-MM-dd")</td>
-                    <td class="text-center">
+                    <td class="d-none d-md-table-cell text-truncate" style="max-width:300px;">@course.Description</td>
+                    <td class="d-none d-sm-table-cell">@course.StartDate.ToString("yyyy-MM-dd")</td>
+                    <td class="text-center text-nowrap" @onclick:stopPropagation="true">
                         <button class="btn btn-sm btn-outline-info me-1"
+                                title="Details"
                                 @onclick="() => OnDetails.InvokeAsync(course)">
-                            <i class="bi bi-eye me-1"></i>Details
+                            <i class="bi bi-eye"></i>
+                            <span class="d-none d-md-inline ms-1">Details</span>
                         </button>
                         <button class="btn btn-sm btn-outline-primary me-1"
+                                title="Edit"
                                 @onclick="() => OnEdit.InvokeAsync(course)">
-                            <i class="bi bi-pencil me-1"></i>Edit
+                            <i class="bi bi-pencil"></i>
+                            <span class="d-none d-md-inline ms-1">Edit</span>
                         </button>
                         <button class="btn btn-sm btn-outline-danger"
+                                title="Delete"
                                 @onclick="() => OnDelete.InvokeAsync(course)">
-                            <i class="bi bi-trash me-1"></i>Delete
+                            <i class="bi bi-trash"></i>
+                            <span class="d-none d-md-inline ms-1">Delete</span>
                         </button>
                     </td>
                 </tr>

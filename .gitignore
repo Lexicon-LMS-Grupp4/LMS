@@ -370,3 +370,7 @@ FodyWeavers.xsd
 /REAL_BACKLOG.md
 /.gitignore
 /.gitignore
+
+# Ignore the uploads folder, but keep the .gitkeep file to ensure the folder is created in new clones
+LMS.API/AppData/UploadedDocuments/*
+!LMS.API/AppData/UploadedDocuments/.gitkeep

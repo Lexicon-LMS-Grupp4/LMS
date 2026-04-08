@@ -1,0 +1,30 @@
+@using LMS.Shared.DTOs.Module
+@using LMS.Blazor.Client.Helpers
+
+<div class="row g-4">
+    @foreach (var module in Modules)
+    {
+        <div class="col-12 col-md-6 col-lg-4">
+            <ModuleCard Module="module"
+                        IsTeacher="IsTeacher"
+                        Gradient="@GetGradient(module.Id)"
+                        OnCycleGradient="OnCycleGradient"
+                        OnEdit="OnEdit"
+                        OnDelete="OnDelete"
+                        OnViewActivities="OnViewActivities" />
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public List<ModuleDto> Modules { get; set; } = [];
+    [Parameter] public bool IsTeacher { get; set; }
+    [Parameter] public Dictionary<int, int> GradientIndex { get; set; } = new();
+    [Parameter] public EventCallback<int> OnCycleGradient { get; set; }
+    [Parameter] public EventCallback<ModuleDto> OnEdit { get; set; }
+    [Parameter] public EventCallback<int> OnDelete { get; set; }
+    [Parameter] public EventCallback<int> OnViewActivities { get; set; }
+
+    private string GetGradient(int id) =>
+        ModuleStyles.Gradients[GradientIndex.GetValueOrDefault(id, id % ModuleStyles.Gradients.Length)];
+}

@@ -33,7 +33,7 @@ public class DataSeedHostingService : IHostedService
         if (!env.IsDevelopment()) return;
 
         dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        
+
         bool hasUsers = await dbContext.Users.AnyAsync(cancellationToken);
         bool hasDocuments = await dbContext.Documents.AnyAsync(cancellationToken);
 
@@ -408,7 +408,7 @@ public class DataSeedHostingService : IHostedService
                 {
                     CourseId = course.Id,
                     DisplayName = name,
-                    FileName = $"{name.ToLower().Replace(' ', '-')}-{i + 1}.{ext}",
+                    StoredFileName = $"{name.ToLower().Replace(' ', '-')}-{i + 1}.{ext}",
                     Description = faker.Lorem.Sentence(),
                     UploadedAt = faker.Date.Recent(30),
                     UploadedByUserId = teacher.Id

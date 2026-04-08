@@ -11,4 +11,6 @@ public class ApplicationUser : IdentityUser
     public ICollection<CourseTeacher> TeachingCourses { get; set; } = [];
     public ICollection<Document> UploadedDocuments { get; set; } = [];
     public ICollection<Submission> Submissions { get; set; } = [];
+    public ICollection<SubmissionComment> SubmissionComments { get; set; } = [];
+
 }

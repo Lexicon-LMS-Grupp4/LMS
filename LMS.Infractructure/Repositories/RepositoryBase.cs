@@ -1,5 +1,6 @@
 ﻿using Domain.Contracts.Repositories;
 using Domain.Models.Entities;
+using Domain.Models.Exceptions;
 using LMS.Infractructure.Data;
 using Microsoft.EntityFrameworkCore;
 using System.Linq.Expressions;
@@ -11,7 +12,7 @@ public abstract class RepositoryBase<T>(ApplicationDbContext context) : IReposit
     protected DbSet<T> DbSet { get; } = context.Set<T>();
     public async Task<T?> FindByIdAsync(int? id) => await DbSet.FindAsync(id);
 
-    public async Task<T> FindByIdOrThrowAsync(int id, bool trackChanges)
+    public async Task<T> FindByIdOrThrowAsync(int id, bool trackChanges = false)
     {
         var query = DbSet.AsQueryable();
 
@@ -23,7 +24,7 @@ public abstract class RepositoryBase<T>(ApplicationDbContext context) : IReposit
         var entity = await query.FirstOrDefaultAsync(m => m.Id == id);
         if (entity == null)
         {
-            throw new KeyNotFoundException($"{typeof(T).Name} with id {id} was not found.");
+            throw new NotFoundException($"{typeof(T).Name} with id {id} was not found.");
         }
         return entity;
     }

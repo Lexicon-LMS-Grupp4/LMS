@@ -1,14 +1,13 @@
-﻿namespace LMS.Shared.DTOs.Submission
+﻿namespace LMS.Shared.DTOs.Submission;
+
+/// <summary>
+/// Data transfer object for creating a new submission.
+/// Used in POST /api/submissions requests.
+/// TODO: add file
+/// </summary>
+public record CreateSubmissionDto
 {
-    /// <summary>
-    /// Data transfer object for creating a new submission.
-    /// Used in POST /api/submissions requests.
-    /// </summary>
-    public record CreateSubmissionDto
-    {
-        public required string StudentId { get; set; }
-        public required int ActivityId { get; set; }
-        public string? Body { get; set; }
-        public int? DocumentId { get; set; }
-    }
+    public required int ActivityId { get; init; }
+    public string? Body { get; init; }
+    public int? DocumentId { get; init; }
 }

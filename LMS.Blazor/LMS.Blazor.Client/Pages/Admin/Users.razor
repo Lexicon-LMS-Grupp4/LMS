@@ -1,0 +1,419 @@
+﻿@page "/admin/students"
+@attribute [Authorize(Roles = "Teacher")]
+@using LMS.Shared.DTOs.Course
+@using LMS.Shared.DTOs.User
+@inject IUserService UserService
+@inject ICourseService CourseService
+@inject NavigationManager Navigation
+
+<PageTitle>User Management</PageTitle>
+
+<div class="container-fluid py-4">
+
+    @* ── Header ── *@
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+        <h2 class="mb-0">User Management</h2>
+    </div>
+
+    @* ── Feedback ── *@
+    @if (!string.IsNullOrEmpty(successMessage))
+    {
+        <div class="alert alert-success alert-dismissible">
+            @successMessage
+            <button type="button" class="btn-close" @onclick="() => successMessage = null"></button>
+        </div>
+    }
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger alert-dismissible">
+            @errorMessage
+            <button type="button" class="btn-close" @onclick="() => errorMessage = null"></button>
+        </div>
+    }
+
+    @* ── Tab bar ── *@
+    <ul class="nav nav-tabs mb-4">
+        @foreach (var tab in Tabs)
+        {
+            <li class="nav-item">
+                <button class="nav-link @(activeTab == tab.Key ? "active" : "")"
+                        @onclick="() => SwitchTabAsync(tab.Key)">
+                    <i class="bi @tab.Icon me-1"></i>
+                    @tab.Label
+                    @if (tab.Key == activeTab && !isLoading)
+                    {
+                        <span class="badge bg-secondary ms-1" style="font-size:0.7rem;">@CurrentList.Count</span>
+                    }
+                </button>
+            </li>
+        }
+    </ul>
+
+    @* ── Course filter (only on "by course" tab) ── *@
+    @if (activeTab == TabKey.ByCourse)
+    {
+        <div class="row g-2 mb-3 align-items-end">
+            <div class="col-12 col-md-4">
+                <label class="form-label small fw-semibold">Select Course</label>
+                <select class="form-select form-select-sm" @bind="selectedCourseId" @bind:after="LoadByCourseAsync">
+                    <option value="0">-- choose a course --</option>
+                    @foreach (var c in courses)
+                    {
+                        <option value="@c.Id">@c.Name</option>
+                    }
+                </select>
+            </div>
+        </div>
+    }
+
+    @* ── Search bar ── *@
+    @if (activeTab != TabKey.ByCourse || selectedCourseId > 0)
+    {
+        <div class="row g-2 mb-3">
+            <div class="col-12 col-md-4">
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text"><i class="bi bi-search"></i></span>
+                    <input class="form-control" placeholder="Search by name or email…"
+                           @bind="searchQuery" @bind:event="oninput" />
+                    @if (!string.IsNullOrEmpty(searchQuery))
+                    {
+                        <button class="btn btn-outline-secondary" @onclick="() => searchQuery = string.Empty">
+                            <i class="bi bi-x"></i>
+                        </button>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+
+    @* ── Table ── *@
+    @if (isLoading)
+    {
+        <div class="text-center py-5">
+            <div class="spinner-border text-primary" role="status"></div>
+            <p class="mt-2 text-muted">Loading users…</p>
+        </div>
+    }
+    else
+    {
+        var visible = FilteredList;
+
+        @if (!visible.Any())
+        {
+            <div class="alert alert-info">
+                @if (activeTab == TabKey.ByCourse && selectedCourseId == 0)
+                {
+                    <span>Select a course above to see its students.</span>
+                }
+                else
+                {
+                    <span>No users found.</span>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="card">
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Username</th>
+                                    <th class="d-none d-sm-table-cell">Email</th>
+                                    @if (activeTab == TabKey.AllStudents || activeTab == TabKey.ByCourse)
+                                    {
+                                        <th class="d-none d-md-table-cell">Course</th>
+                                    }
+                                    <th style="width:100px;"></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var user in visible)
+                                {
+                                    <tr>
+                                        <td class="text-truncate" style="max-width:160px;">
+                                            @user.Name
+                                        </td>
+                                        <td class="d-none d-sm-table-cell text-truncate" style="max-width:220px;">
+                                            @user.Email
+                                        </td>
+                                        @if (activeTab == TabKey.AllStudents || activeTab == TabKey.ByCourse)
+                                        {
+                                            <td class="d-none d-md-table-cell">
+                                                @if (user.CourseName is not null)
+                                                {
+                                                    <span class="badge bg-primary">@user.CourseName</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="text-muted small">—</span>
+                                                }
+                                            </td>
+                                        }
+                                        <td class="text-end text-nowrap">
+                                            <div class="d-flex gap-1 justify-content-end">
+                                                @* Unenroll button — students with a course *@
+                                                @if ((activeTab == TabKey.AllStudents || activeTab == TabKey.ByCourse)
+                                                      && user.CourseId is not null)
+                                                {
+                                                    <button class="btn btn-sm btn-outline-warning"
+                                                            title="Remove from course"
+                                                            @onclick="() => RemoveFromCourseAsync(user)">
+                                                        <i class="bi bi-person-dash"></i>
+                                                    </button>
+                                                }
+                                                @* Delete button *@
+                                                @if (pendingDeleteId == user.Id)
+                                                {
+                                                    <button class="btn btn-sm btn-danger"
+                                                            title="Confirm delete"
+                                                            @onclick="() => ConfirmDeleteAsync(user.Id)">
+                                                        <i class="bi bi-check-lg"></i> Sure?
+                                                    </button>
+                                                    <button class="btn btn-sm btn-secondary"
+                                                            @onclick="() => pendingDeleteId = null">
+                                                        <i class="bi bi-x"></i>
+                                                    </button>
+                                                }
+                                                else
+                                                {
+                                                    <button class="btn btn-sm btn-outline-danger"
+                                                            title="Delete user"
+                                                            @onclick="() => pendingDeleteId = user.Id">
+                                                        <i class="bi bi-trash"></i>
+                                                    </button>
+                                                }
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="card-footer text-muted small">
+                    Showing @visible.Count of @CurrentList.Count users
+                </div>
+            </div>
+        }
+    }
+
+    @* ── Confirm-delete safety note ── *@
+    @if (pendingDeleteId is not null)
+    {
+        <div class="alert alert-warning mt-3 small">
+            <i class="bi bi-exclamation-triangle me-1"></i>
+            Click <strong>Sure?</strong> to permanently delete the user from the database. This cannot be undone.
+        </div>
+    }
+</div>
+
+@code {
+
+    // ── Tab definitions ───────────────────────────────────────────────────────
+
+    private enum TabKey { AllStudents, ByCourse, Unenrolled, Teachers }
+
+    private record TabDef(TabKey Key, string Label, string Icon);
+
+    private static readonly TabDef[] Tabs =
+    [
+        new(TabKey.AllStudents, "All Students",    "bi-people-fill"),
+        new(TabKey.ByCourse,    "By Course",       "bi-journal-text"),
+        new(TabKey.Unenrolled,  "No Course",       "bi-person-x"),
+        new(TabKey.Teachers,    "Teachers",        "bi-person-badge"),
+    ];
+
+    // ── State ─────────────────────────────────────────────────────────────────
+
+    private TabKey activeTab = TabKey.AllStudents;
+
+    private List<UserDto> allStudents = [];
+    private List<UserDto> unenrolled = [];
+    private List<UserDto> teachers = [];
+    private List<StudentBasicDto> byCourse = [];
+    private List<CourseDto> courses = [];
+
+    private int selectedCourseId = 0;
+    private string searchQuery = string.Empty;
+    private bool isLoading;
+    private string? successMessage;
+    private string? errorMessage;
+    private string? pendingDeleteId;
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    private List<UserDto> CurrentList => activeTab switch
+    {
+        TabKey.AllStudents => allStudents,
+        TabKey.ByCourse => byCourse.Select(u => new UserDto
+        {
+            Id = u.Id,
+            Name = u.Name,
+            Email = u.Email,
+            Role = "Student",
+            CourseId = u.CourseId,
+            CourseName = u.CourseName
+        }).ToList(),
+        TabKey.Unenrolled => unenrolled,
+        TabKey.Teachers => teachers,
+        _ => []
+    };
+
+    private List<UserDto> FilteredList
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(searchQuery))
+                return CurrentList;
+
+            var q = searchQuery.Trim();
+            return CurrentList
+                .Where(u =>
+                    u.Name.Contains(q, StringComparison.OrdinalIgnoreCase) ||
+                    u.Email.Contains(q, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+        }
+    }
+
+    // ── Lifecycle ─────────────────────────────────────────────────────────────
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCoursesAsync();
+        await LoadCurrentTabAsync();
+    }
+
+    // ── Tab switching ─────────────────────────────────────────────────────────
+
+    private async Task SwitchTabAsync(TabKey tab)
+    {
+        activeTab = tab;
+        searchQuery = string.Empty;
+        pendingDeleteId = null;
+        await LoadCurrentTabAsync();
+    }
+
+    private async Task LoadCurrentTabAsync()
+    {
+        isLoading = true;
+        errorMessage = null;
+        StateHasChanged();
+
+        try
+        {
+            switch (activeTab)
+            {
+                case TabKey.AllStudents:
+                    allStudents = (await UserService.GetAllUsersAsync(page: 1, pageSize: 100))?.Items ?? [];
+                    break;
+
+                case TabKey.ByCourse:
+                    if (selectedCourseId > 0)
+                        await LoadByCourseAsync();
+                    break;
+
+                case TabKey.Unenrolled:
+                    unenrolled = (await UserService.GetUsersWithoutCourseAsync(page: 1, pageSize: 100))?.Items ?? [];
+                    break;
+
+                case TabKey.Teachers:
+                    teachers = (await UserService.GetTeachersAsync(page: 1, pageSize: 100))?.Items ?? [];
+                    break;
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to load users. {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task LoadByCourseAsync()
+    {
+        if (selectedCourseId == 0) { byCourse = []; return; }
+
+        isLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            var raw = await UserService.GetUsersByCourseAsync(selectedCourseId) ?? [];
+            var courseName = courses.FirstOrDefault(c => c.Id == selectedCourseId)?.Name;
+
+            byCourse = raw.Select(s => new StudentBasicDto
+            {
+                Id = s.Id,
+                Name = s.Name,
+                Email = s.Email,
+                CourseId = selectedCourseId,
+                CourseName = courseName
+            }).ToList();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to load course students. {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task LoadCoursesAsync()
+    {
+        try
+        {
+            var paged = await CourseService.GetAllCoursesAsync(page: 1, pageSize: 100);
+            courses = paged?.Items ?? [];
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to load courses. {ex.Message}";
+        }
+    }
+
+    // ── Actions ───────────────────────────────────────────────────────────────
+
+    private async Task RemoveFromCourseAsync(UserDto user)
+    {
+        errorMessage = null;
+        successMessage = null;
+
+        var ok = await UserService.RemoveUserFromCourseAsync(user.Id);
+
+        if (ok)
+        {
+            successMessage = $"{user.Name} removed from course.";
+            await LoadCurrentTabAsync();
+        }
+        else
+        {
+            errorMessage = $"Failed to remove {user.Name} from course.";
+        }
+    }
+
+    private async Task ConfirmDeleteAsync(string userId)
+    {
+        pendingDeleteId = null;
+        errorMessage = null;
+        successMessage = null;
+
+        var user = CurrentList.FirstOrDefault(u => u.Id == userId);
+        var ok = await UserService.DeleteUserAsync(userId);
+
+        if (ok)
+        {
+            successMessage = $"User '{user?.Name ?? userId}' deleted.";
+            await LoadCurrentTabAsync();
+        }
+        else
+        {
+            errorMessage = "Failed to delete user. Check server logs.";
+        }
+    }
+}

@@ -1,0 +1,177 @@
+@using LMS.Shared.DTOs.Common
+@using LMS.Shared.DTOs.User
+@using LMS.Shared.DTOs.Course
+@using System.ComponentModel.DataAnnotations
+@inject IApiService ApiService
+
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0">@(isEditMode ? "Edit User" : "Create User")</h5>
+    </div>
+    <div class="card-body">
+
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <div class="alert alert-danger alert-dismissible">
+                @errorMessage
+                <button type="button" class="btn-close" @onclick="() => errorMessage = null"></button>
+            </div>
+        }
+
+        <EditForm Model="model" OnValidSubmit="HandleValidSubmitAsync">
+            <DataAnnotationsValidator />
+
+            @* ---- Name ---- *@
+            <div class="mb-3">
+                <label class="form-label fw-semibold">Name <span class="text-danger">*</span></label>
+                <InputText class="form-control" @bind-Value="model.Name" placeholder="User name" />
+                <ValidationMessage For="() => model.Name" class="text-danger small" />
+            </div>
+
+            @* ---- Email ---- *@
+            <div class="mb-3">
+                <label class="form-label fw-semibold">Email</label>
+                <InputText class="form-control" @bind-Value="model.Email" placeholder="User Email" />
+                <ValidationMessage For="() => model.Email" class="text-danger small" />
+            </div>
+
+            @* ---- Course Id ---- *@
+            <div class="mb-3">
+                <label class="form-label fw-semibold">Course</label>
+                <InputSelect class="form-control" @bind-Value="model.CourseId" autocomplete="off">
+                    <option value="">-- Select Course --</option>
+                    @if (courses != null){
+                        @foreach (var course in courses) {
+                            <option value="@course.Id">@course.Name (#@course.Id)</option>
+                        }
+                    }
+                </InputSelect>
+                <ValidationMessage For="() => model.CourseId" class="text-danger small" />
+            </div>
+
+            @* ---- Actions ---- *@
+            <div class="d-flex gap-2 mt-4">
+                <button type="submit" class="btn btn-primary" disabled="@isSubmitting">
+                    @if (isSubmitting)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1"></span>
+                    }
+                    @(isEditMode ? "Update User" : "Save User")
+                </button>
+                <button type="button" class="btn btn-secondary"
+                        @onclick="OnCancel" disabled="@isSubmitting">
+                    Cancel
+                </button>
+            </div>
+
+        </EditForm>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public UserDto? User { get; set; }
+
+    [Parameter, EditorRequired]
+    public EventCallback<UserDto> OnSubmit { get; set; }
+
+    [Parameter, EditorRequired]
+    public EventCallback OnCancel { get; set; }
+
+    private UserFormModel model = new();
+    private bool isEditMode;
+    private bool isSubmitting;
+    private string? errorMessage;
+
+    private IEnumerable<CourseDto>? courses;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var result = await ApiService.GetAsync<PagedResultDto<CourseDto>>($"api/courses?pageSize=9999");
+            if (result is not null) courses = result.Items;
+        }
+        catch (Exception ex)
+        {
+            errorMessage  = $"Failed to load courses. {ex.Message}";
+        }
+    }
+
+    protected override void OnParametersSet()
+    {
+        isEditMode = User is not null;
+
+        model = isEditMode
+            ? new UserFormModel
+            {
+                Name = User?.Name!,
+                Email = User?.Email!,
+                CourseId = User?.CourseId!
+            }
+            : new UserFormModel();
+    }
+
+    private async Task HandleValidSubmitAsync()
+    {
+        isSubmitting = true;
+        errorMessage = null;
+
+        try
+        {
+            if (isEditMode)
+            {
+                var updateDto = new UpdateUserDto
+                {
+                    Name = model.Name,
+                    Email = model.Email,
+                    CourseId = model.CourseId
+                };
+                await ApiService.PutAsync<object>($"api/users/{User.Id}", updateDto);
+                await OnSubmit.InvokeAsync(User! with
+                {
+                    Id = User.Id,
+                    Name = model.Name,
+                    Email = model.Email,
+                    CourseId = model.CourseId
+                });
+            }
+            else
+            {
+                var createDto = new CreateUserDto
+                {
+                    Name = model.Name,
+                    Email = model.Email,
+                    CourseId = model.CourseId
+                };
+                var result = await ApiService.PostAsync<UserDto>($"api/users", createDto);
+                if (result is not null)
+                    await OnSubmit.InvokeAsync(result);
+                else
+                    errorMessage = "Failed to create user. Please try again.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"An error occurred: {ex.Message}";
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+    // ---- Internal form model with validation attributes ----
+    private class UserFormModel
+    {
+        public int? CourseId { get; set; }
+
+        [MaxLength(200, ErrorMessage = "Name cannot exceed 200 characters.")]
+        public string Name { get; set; } = string.Empty;
+
+        [MaxLength(254, ErrorMessage = "Email cannot exceed 254 characters.")]
+        public string Email { get; set; } = string.Empty;
+
+    }
+
+}
