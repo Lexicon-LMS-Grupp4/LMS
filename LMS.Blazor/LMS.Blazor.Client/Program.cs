@@ -25,6 +25,7 @@ internal class Program
         builder.Services.AddScoped<IModuleService, ModuleService>();
         builder.Services.AddScoped<IActivityService, ActivityService>();
         builder.Services.AddScoped<IUserService, UserService>();
+        builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 
         await builder.Build().RunAsync();
     }
