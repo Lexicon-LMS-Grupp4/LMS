@@ -77,6 +77,7 @@ public class Program
         builder.Services.AddScoped<ICourseService, ServerNoOpCourseService>();
         builder.Services.AddScoped<IModuleService, ServerNoOpModuleService>();
         builder.Services.AddScoped<IActivityService, ServerNoOpActivityService>();
+        builder.Services.AddScoped<ICurrentUserService, ServerNoOpCurrentUserService>();
 
         var app = builder.Build();
 

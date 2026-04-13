@@ -1,5 +1,10 @@
 @implements IDisposable
+
+@inject AuthenticationStateProvider AuthStateProvider
 @inject NavigationManager NavigationManager
+@inject ICurrentUserService CurrentUserService
+
+@using LMS.Shared.DTOs.User
 @using Microsoft.AspNetCore.Components.Authorization
 
 <div class="top-row ps-3 navbar navbar-dark">
@@ -90,56 +95,65 @@
 
         <AuthorizeView Roles="Student">
             <Authorized>
-                <div class="nav-section">
-                    <div class="nav-section-title">Student</div>
+                @if (profile is null)
+                {
+                    <div class="text-center py-5">
+                        <div class="spinner-border text-primary" role="status"></div>
+                    </div>
+                }
 
-                    <div class="nav-item ">
+                else
+                {
+                    <div class="nav-section">
+                        <div class="nav-section-title">Student</div>
+
+                        <div class="nav-item ">
                             <NavLink class="nav-link" href="/student/dashboard">
-                            <span class="bi bi-grid-nav-menu" aria-hidden="true"></span>
-                            Dashboard
-                        </NavLink>
-                    </div>
-
-                    <div class="nav-item ">
-                        <NavLink class="nav-link" href="/modules">
-                            <span class="bi bi-folder-nav-menu" aria-hidden="true"></span>
-                            Modules @*Should be dynamically changed and set to the Course.Name of the course the student is enrolled in*@
-                        </NavLink>
-                    </div>
-                    <div class="nav-item">
-                        <NavLink class="nav-link" href="/submissions">
-                            <span class="bi bi-folder-nav-menu" aria-hidden="true"></span>
-                            Submissions
-                        </NavLink>
-                    </div>
-                    <div class="nav-item">
-                        <NavLink class="nav-link" href="/students">
-                            <span class="bi bi-folder-nav-menu" aria-hidden="true"></span>
-                            Students
-                        </NavLink>
-                    </div>
-                </div>
-
-                <div class="nav-section">
-                    <div class="nav-section-title">Account</div>
-
-                    <div class="nav-item">
-                        <div class="nav-item">
-                            <NavLink class="nav-link" href="Account/Manage">
-                                <span class="bi bi-person-nav-menu" aria-hidden="true"></span>
-                                Profile
+                                <span class="bi bi-grid-nav-menu" aria-hidden="true"></span>
+                                Dashboard
                             </NavLink>
                         </div>
-
-                        <form action="Account/Logout" method="post">
-                            <AntiforgeryToken />
-                            <input type="hidden" name="ReturnUrl" value="@currentUrl" />
-                            <button type="submit" class="nav-link">
-                                <span class="bi bi-arrow-bar-left-nav-menu" aria-hidden="true"></span> Logout
-                            </button>
-                        </form>
+                        <div class="nav-item ">
+                            <NavLink class="nav-link" href=@($"/courses/{profile.CourseId}")>
+                                <span class="bi bi-folder-nav-menu" aria-hidden="true"></span>
+                                @profile.CourseName
+                            </NavLink>
+                        </div>
+                        <div class="nav-item">
+                            <NavLink class="nav-link" href="/submissions">
+                                <span class="bi bi-folder-nav-menu" aria-hidden="true"></span>
+                                Submissions
+                            </NavLink>
+                        </div>
+                        <div class="nav-item">
+                            <NavLink class="nav-link" href="/students">
+                                <span class="bi bi-folder-nav-menu" aria-hidden="true"></span>
+                                Students
+                            </NavLink>
+                        </div>
                     </div>
-                </div>
+
+                    <div class="nav-section">
+                        <div class="nav-section-title">Account</div>
+
+                        <div class="nav-item">
+                            <div class="nav-item">
+                                <NavLink class="nav-link" href="Account/Manage">
+                                    <span class="bi bi-person-nav-menu" aria-hidden="true"></span>
+                                    @profile.Name
+                                </NavLink>
+                            </div>
+
+                            <form action="Account/Logout" method="post">
+                                <AntiforgeryToken />
+                                <input type="hidden" name="ReturnUrl" value="@currentUrl" />
+                                <button type="submit" class="nav-link">
+                                    <span class="bi bi-arrow-bar-left-nav-menu" aria-hidden="true"></span> Logout
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                }
             </Authorized>
         </AuthorizeView>
 
@@ -147,12 +161,20 @@
 </div>
 
 @code {
+    private UserDto? profile;
     private string? currentUrl;
 
-    protected override void OnInitialized()
+    protected async override Task OnInitializedAsync()
     {
         currentUrl = NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
         NavigationManager.LocationChanged += OnLocationChanged;
+
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+
+        if (authState.User.Identity?.IsAuthenticated == true)
+        {
+            profile = await CurrentUserService.GetMeAsync();
+        }
     }
 
     private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
