@@ -45,51 +45,60 @@
 
         <AuthorizeView Roles="Teacher">
             <Authorized>
-                <div class="nav-section">
-                    <div class="nav-section-title">teacher</div>
+                @if (profile is null)
+                {
+                    <div class="text-center py-5">
+                        <div class="spinner-border text-primary" role="status"></div>
+                    </div>
+                }
+                else
+                {
+                    <div class="nav-section">
+                        <div class="nav-section-title">teacher</div>
     
-                    <div class="nav-item ">
-                        <NavLink class="nav-link" href="/admin/courses">
-                            <span class="bi bi-book-nav-menu" aria-hidden="true"></span>
-                            Courses
-                        </NavLink>
-                    </div>
+                        <div class="nav-item ">
+                            <NavLink class="nav-link" href="/admin/courses">
+                                <span class="bi bi-book-nav-menu" aria-hidden="true"></span>
+                                Courses
+                            </NavLink>
+                        </div>
                     
-                    <div class="nav-item ">
-                        <NavLink class="nav-link" href="/admin/users">
-                            <span class="bi bi-people-nav-menu" aria-hidden="true"></span>
-                            Users
-                        </NavLink>
+                        <div class="nav-item ">
+                            <NavLink class="nav-link" href="/admin/users">
+                                <span class="bi bi-people-nav-menu" aria-hidden="true"></span>
+                                Users
+                            </NavLink>
+                        </div>
+
+                        <div class="nav-item ">
+                            <NavLink class="nav-link" href="/admin/submissions">
+                                <span class="bi bi-book-nav-menu" aria-hidden="true"></span>
+                                Submissions
+                            </NavLink>
+                        </div>
                     </div>
 
-                    <div class="nav-item ">
-                        <NavLink class="nav-link" href="/admin/submissions">
-                            <span class="bi bi-book-nav-menu" aria-hidden="true"></span>
-                            Submissions
-                        </NavLink>
-                    </div>
-                </div>
+                    <div class="nav-section">
+                        <div class="nav-section-title">Account</div>
 
-                <div class="nav-section">
-                    <div class="nav-section-title">Account</div>
+                        <div class="nav-item">
+                            <NavLink class="nav-link" href="Account/Manage">
+                                <span class="bi bi-person-nav-menu" aria-hidden="true"></span>
+                                @profile.Name
+                            </NavLink>
+                        </div>
 
-                    <div class="nav-item">
-                        <NavLink class="nav-link" href="Account/Manage">
-                            <span class="bi bi-person-nav-menu" aria-hidden="true"></span>
-                            Profile
-                        </NavLink>
+                        <div class="nav-item">
+                            <form action="Account/Logout" method="post">
+                                <AntiforgeryToken />
+                                <input type="hidden" name="ReturnUrl" value="@currentUrl" />
+                                <button type="submit" class="nav-link">
+                                    <span class="bi bi-arrow-bar-left-nav-menu" aria-hidden="true"></span> Logout
+                                </button>
+                            </form>
+                        </div>
                     </div>
-
-                    <div class="nav-item">
-                        <form action="Account/Logout" method="post">
-                            <AntiforgeryToken />
-                            <input type="hidden" name="ReturnUrl" value="@currentUrl" />
-                            <button type="submit" class="nav-link">
-                                <span class="bi bi-arrow-bar-left-nav-menu" aria-hidden="true"></span> Logout
-                            </button>
-                        </form>
-                    </div>
-                </div>
+                }
             </Authorized>
         </AuthorizeView>
 
