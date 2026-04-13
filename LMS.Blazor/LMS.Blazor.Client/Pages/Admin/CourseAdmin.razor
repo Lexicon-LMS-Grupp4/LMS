@@ -70,6 +70,7 @@
     {
         <CourseListComponent Courses="courses"
                              OnDetails="HandleDetailsClicked"
+                             OnModules="HandleModulesClicked"
                              OnEdit="HandleEditClicked"
                              OnDelete="HandleDeleteClicked" />
 
@@ -223,5 +224,10 @@
     private void HandleDetailsClicked(CourseDto course)
     {
         Navigation.NavigateTo($"/admin/courses/{course.Id}/details");
+    }
+
+    private void HandleModulesClicked(CourseDto course)
+    {
+        Navigation.NavigateTo($"/courses/{course.Id}");
     }
 }

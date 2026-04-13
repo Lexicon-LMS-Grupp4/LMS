@@ -19,10 +19,10 @@
                     <td class="d-none d-sm-table-cell">@course.StartDate.ToString("yyyy-MM-dd")</td>
                     <td class="text-center text-nowrap" @onclick:stopPropagation="true">
                         <button class="btn btn-sm btn-outline-info me-1"
-                                title="Details"
-                                @onclick="() => OnDetails.InvokeAsync(course)">
+                                title="Modules"
+                                @onclick="() => OnModules.InvokeAsync(course)">
                             <i class="bi bi-eye"></i>
-                            <span class="d-none d-md-inline ms-1">Details</span>
+                            <span class="d-none d-md-inline ms-1">Modules</span>
                         </button>
                         <button class="btn btn-sm btn-outline-primary me-1"
                                 title="Edit"
@@ -55,4 +55,7 @@
 
     [Parameter, EditorRequired]
     public EventCallback<CourseDto> OnDetails { get; set; }
+
+    [Parameter, EditorRequired]
+    public EventCallback<CourseDto> OnModules { get; set; }
 }
