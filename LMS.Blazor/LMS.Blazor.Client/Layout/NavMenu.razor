@@ -72,7 +72,7 @@
 
                         <div class="nav-item ">
                             <NavLink class="nav-link" href="/admin/submissions">
-                                <span class="bi bi-book-nav-menu" aria-hidden="true"></span>
+                                <span class="bi bi-pencil-square-nav-menu" aria-hidden="true"></span>
                                 Submissions
                             </NavLink>
                         </div>
@@ -82,13 +82,13 @@
                         <div class="nav-section-title">Account</div>
 
                         <div class="nav-item">
-                            <NavLink class="nav-link" href="Account/Manage">
-                                <span class="bi bi-person-nav-menu" aria-hidden="true"></span>
-                                @profile.Name
-                            </NavLink>
-                        </div>
+                            <div class="nav-item">
+                                <NavLink class="nav-link" href="Account/Manage">
+                                    <span class="bi bi-person-badge-nav-menu" aria-hidden="true"></span>
+                                    @profile.Name
+                                </NavLink>
+                            </div>
 
-                        <div class="nav-item">
                             <form action="Account/Logout" method="post">
                                 <AntiforgeryToken />
                                 <input type="hidden" name="ReturnUrl" value="@currentUrl" />
@@ -124,20 +124,26 @@
                         </div>
                         <div class="nav-item ">
                             <NavLink class="nav-link" href=@($"/courses/{profile.CourseId}")>
-                                <span class="bi bi-folder-nav-menu" aria-hidden="true"></span>
+                                <span class="bi bi-book-nav-menu" aria-hidden="true"></span>
                                 @profile.CourseName
                             </NavLink>
                         </div>
                         <div class="nav-item">
                             <NavLink class="nav-link" href="/submissions">
-                                <span class="bi bi-folder-nav-menu" aria-hidden="true"></span>
+                                <span class="bi bi-pencil-square-nav-menu" aria-hidden="true"></span>
                                 Submissions
                             </NavLink>
                         </div>
                         <div class="nav-item">
                             <NavLink class="nav-link" href="/students">
-                                <span class="bi bi-folder-nav-menu" aria-hidden="true"></span>
+                                <span class="bi bi-people-nav-menu" aria-hidden="true"></span>
                                 Students
+                            </NavLink>
+                        </div>
+                        <div class="nav-item">
+                            <NavLink class="nav-link" href="/documents">
+                                <span class="bi bi-folder-nav-menu" aria-hidden="true"></span>
+                                Documents
                             </NavLink>
                         </div>
                     </div>
@@ -148,7 +154,7 @@
                         <div class="nav-item">
                             <div class="nav-item">
                                 <NavLink class="nav-link" href="Account/Manage">
-                                    <span class="bi bi-person-nav-menu" aria-hidden="true"></span>
+                                    <span class="bi bi-person-badge-nav-menu" aria-hidden="true"></span>
                                     @profile.Name
                                 </NavLink>
                             </div>
