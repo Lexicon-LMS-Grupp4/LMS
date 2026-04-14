@@ -28,7 +28,7 @@
             <p class="text-muted mb-0">Browse and manage course materials, modules, and work files.</p>
         </div>
         <AuthorizeView Roles="Teacher">
-            <button class="btn btn-primary shadow-sm" @onclick="ToggleUploadPanel">
+            <button class="btn btn-primary shadow-sm" @onclick="ToggleUploadPanel" disabled="@UploadBtnDisabledState()">
                 <i class="bi @(showUploadPanel ? "bi-dash-lg" : "bi-plus-lg") me-1"></i>
                 @(showUploadPanel ? "Close Panel" : $"Upload Document to {activeLayer}")
             </button>
@@ -475,6 +475,17 @@
             "Module" => selectedModuleId > 0,
             "Activity" => selectedActivityId > 0,
             _ => false
+        };
+    }
+
+    private bool UploadBtnDisabledState()
+    {
+        return activeLayer switch
+        {
+            "Course" => selectedCourseId <= 0,
+            "Module" => selectedModuleId <= 0,
+            "Activity" => selectedActivityId <= 0,
+            _ => true
         };
     }
 
