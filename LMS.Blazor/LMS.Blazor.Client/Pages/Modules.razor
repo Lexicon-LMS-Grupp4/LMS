@@ -155,7 +155,11 @@
         }
     }
 
-    private void ToggleRole() => isTeacher = !isTeacher;
+    private void ToggleRole() 
+    {
+        isTeacher = !isTeacher;
+        isDialogOpen = false;
+    }
     private void CycleGradient(int id) => gradientIndex[id] = (gradientIndex.GetValueOrDefault(id, id % ModuleStyles.Gradients.Length) + 1) % ModuleStyles.Gradients.Length;
     
     private void GoToModule(int id) =>
