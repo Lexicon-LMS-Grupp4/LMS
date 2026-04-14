@@ -40,5 +40,8 @@ namespace LMS.Shared.DTOs.Document
         public string? ActivityName { get; init; }
         public int? SubmissionId { get; init; }
         public required string Scope { get; init; }
+        public int? ParentCourseId { get; init; }
+        public int? ParentModuleId { get; init; }
+        public int? ParentActivityId { get; init; }
     }
 }
