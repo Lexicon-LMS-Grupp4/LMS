@@ -49,7 +49,7 @@ public class DocumentManager(
         document.FileSize = savedFileResult.FileSize;
         document.ContentType = file.ContentType;
         document.DisplayName = file.FileName;
-        document.UploadedAt = DateTime.UtcNow;
+        document.UploadedAt = DateTime.Now;
     }
 
     public async Task SaveDocumentAsync(Document document)

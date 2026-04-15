@@ -98,8 +98,8 @@ public class SubmissionService : ISubmissionService
             var timelineComment = BuildResubmissionTimelineComment(existingSubmission, dto.Body, dto.File, dto.RemoveFile);
 
             existingSubmission.Body = dto.Body;
-            existingSubmission.SubmittedAt = DateTime.UtcNow;
-            existingSubmission.IsLate = activity.EndTime < DateTime.UtcNow;
+            existingSubmission.SubmittedAt = DateTime.Now;
+            existingSubmission.IsLate = activity.EndTime < DateTime.Now;
 
             if (dto.File != null)
             {
@@ -126,8 +126,8 @@ public class SubmissionService : ISubmissionService
 
         var submission = mapper.Map<Submission>(dto);
         submission.StudentId = userId;
-        submission.SubmittedAt = DateTime.UtcNow;
-        submission.IsLate = activity.EndTime < DateTime.UtcNow;
+        submission.SubmittedAt = DateTime.Now;
+        submission.IsLate = activity.EndTime < DateTime.Now;
 
         unitOfWork.Submissions.Create(submission);
         await unitOfWork.CompleteAsync();

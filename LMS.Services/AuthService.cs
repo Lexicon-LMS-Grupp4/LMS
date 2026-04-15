@@ -45,7 +45,7 @@ public class AuthService : IAuthService
         user.RefreshToken = GenerateRefreshToken();
 
         if (addTime)
-            user.RefreshTokenExpireTime = DateTime.UtcNow.AddDays(3);
+            user.RefreshTokenExpireTime = DateTime.Now.AddDays(3);
 
         var res = await userManager.UpdateAsync(user);
         if (!res.Succeeded) throw new Exception(string.Join("/n", res.Errors));
