@@ -18,7 +18,7 @@ public class SubmissionComment : EntityBase
             SubmissionId = submissionId,
             AuthorId = authorId,
             Text = text.Trim(),
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = DateTime.Now
         };
     }
 }
