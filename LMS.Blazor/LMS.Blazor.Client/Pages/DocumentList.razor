@@ -260,9 +260,11 @@
                                     <tr>
                                         <td class="ps-4">
                                             <div class="d-flex align-items-start gap-3">
-                                                <div class="rounded-3 bg-white border p-2 d-flex align-items-center justify-content-center" style="width: 44px; height: 44px;">
-                                                    <i class="@GetIconForContentType(doc.ContentType) fs-4 text-primary opacity-75"></i>
-                                                </div>
+                                                <a href="@DocumentService.GetDocumentFileUrl(doc.Id, false)" target="document-tab">
+                                                    <div class="rounded-3 bg-white border p-2 d-flex align-items-center justify-content-center" style="width: 44px; height: 44px;">
+                                                        <i class="@GetIconForContentType(doc.ContentType) fs-4 text-primary opacity-75"></i>
+                                                    </div>
+                                                </a>
                                                 <div>
                                                     <div class="fw-bold text-dark">@doc.DisplayName</div>
                                                     <div class="text-muted small text-truncate" style="max-width: 250px;">@doc.Description</div>
@@ -411,11 +413,12 @@
         // but hide children and clear them if we're moving up.
         if (activeLayer == "Course")
         {
-            // Do not reset course. We can use it.
+            selectedActivityId = 0;
+            selectedModuleId = 0;
         }
         else if (activeLayer == "Module")
         {
-            // Do not reset Module.
+            selectedModuleId = 0;
         }
 
         await RefreshDocumentList();
