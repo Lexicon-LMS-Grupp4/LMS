@@ -28,7 +28,7 @@
             <p class="text-muted mb-0">Browse and manage course materials, modules, and work files.</p>
         </div>
         <AuthorizeView Roles="Teacher">
-            <button class="btn btn-primary shadow-sm" @onclick="ToggleUploadPanel">
+            <button class="btn btn-primary shadow-sm" @onclick="ToggleUploadPanel" disabled="@UploadBtnDisabledState()">
                 <i class="bi @(showUploadPanel ? "bi-dash-lg" : "bi-plus-lg") me-1"></i>
                 @(showUploadPanel ? "Close Panel" : $"Upload Document to {activeLayer}")
             </button>
@@ -260,9 +260,11 @@
                                     <tr>
                                         <td class="ps-4">
                                             <div class="d-flex align-items-start gap-3">
-                                                <div class="rounded-3 bg-white border p-2 d-flex align-items-center justify-content-center" style="width: 44px; height: 44px;">
-                                                    <i class="@GetIconForContentType(doc.ContentType) fs-4 text-primary opacity-75"></i>
-                                                </div>
+                                                <a href="@DocumentService.GetDocumentFileUrl(doc.Id, false)" target="document-tab">
+                                                    <div class="rounded-3 bg-white border p-2 d-flex align-items-center justify-content-center" style="width: 44px; height: 44px;">
+                                                        <i class="@GetIconForContentType(doc.ContentType) fs-4 text-primary opacity-75"></i>
+                                                    </div>
+                                                </a>
                                                 <div>
                                                     <div class="fw-bold text-dark">@doc.DisplayName</div>
                                                     <div class="text-muted small text-truncate" style="max-width: 250px;">@doc.Description</div>
@@ -343,10 +345,10 @@
     private bool isLoading = true;
     private bool showUploadPanel;
     private bool isEditDialogOpen;
-    
+
     // Core state
     private string activeLayer = "Course"; // "Course", "Module", "Activity"
-    
+
     // Filters
     private int selectedCourseId;
     private int selectedModuleId;
@@ -359,7 +361,7 @@
     private List<ActivityDto> activities = new();
     private List<DocumentDto> allDocuments = new();
     private List<DocumentDto> filteredDocuments = new();
-    
+
     // Upload state
     private UploadDocumentValue documentUpload = new();
     private string? uploadError;
@@ -378,7 +380,7 @@
     private async Task LoadInitialDataAsync()
     {
         isLoading = true;
-        
+
         if (isTeacher)
         {
             var coursesResult = await CourseService.GetAllCoursesAsync(1, 100);
@@ -406,18 +408,19 @@
         uploadError = null;
         uploadSuccess = null;
         showUploadPanel = false;
-        
+
         // When switching layers, try to maintain context as much as possible
         // but hide children and clear them if we're moving up.
         if (activeLayer == "Course")
         {
-            // Do not reset course. We can use it.
+            selectedActivityId = 0;
+            selectedModuleId = 0;
         }
         else if (activeLayer == "Module")
         {
-            // Do not reset Module.
+            selectedModuleId = 0;
         }
-        
+
         await RefreshDocumentList();
     }
 
@@ -478,6 +481,17 @@
         };
     }
 
+    private bool UploadBtnDisabledState()
+    {
+        return activeLayer switch
+        {
+            "Course" => selectedCourseId <= 0,
+            "Module" => selectedModuleId <= 0,
+            "Activity" => selectedActivityId <= 0,
+            _ => true
+        };
+    }
+
     private async Task RefreshDocumentList()
     {
         allDocuments.Clear();
@@ -489,30 +503,18 @@
         {
             ScopeTarget = activeLayer 
         };
-        
-        // EXPLICIT FILTERING BY LAYER
+
         if (activeLayer == "Course" && selectedCourseId > 0)
         {
             query = query with { CourseId = selectedCourseId };
         }
-        else if (activeLayer == "Module")
+        else if (activeLayer == "Module" && selectedModuleId > 0)
         {
-            if (selectedCourseId > 0)
-            {
-                 // Wait, if Course is selected but Module is ALL, we want all modules IN THAT COURSE.
-                 // The backend doesn't support "All modules in Course X" natively via DocumentQueryDto unless we do it via module IDs?
-                 // Actually, if we just pass CourseId=X and ScopeTarget=Module, what happens? 
-                 // Let's just pass what we have.
-                 if (selectedModuleId > 0) query = query with { ModuleId = selectedModuleId };
-                 // Currently backend DocumentQueryDto applies CourseId literally (d.CourseId == CourseId). 
-                 // For Module documents, d.CourseId is NOT set (it's null). 
-                 // So we can only filter by ModuleId! Wait, filtering by CourseId for module docs won't work on the backend unless we implement it!
-            }
-            if (selectedModuleId > 0) query = query with { ModuleId = selectedModuleId };
+            query = query with { ModuleId = selectedModuleId };
         }
-        else if (activeLayer == "Activity")
+        else if (activeLayer == "Activity" && selectedActivityId > 0)
         {
-            if (selectedActivityId > 0) query = query with { ActivityId = selectedActivityId };
+            query = query with { ActivityId = selectedActivityId };
         }
 
         var result = await DocumentService.GetAllDocumentsAsync(1, 100, query);
@@ -525,7 +527,25 @@
 
     private void ApplyLocalFilters()
     {
-        filteredDocuments = allDocuments.Where(d => 
+        IEnumerable<DocumentDto> docs = allDocuments;
+
+        // FILTER BY HIERARCHY
+        if (selectedCourseId > 0)
+        {
+            docs = docs.Where(d => d.ParentCourseId == selectedCourseId);
+        }
+
+        if (selectedModuleId > 0)
+        {
+            docs = docs.Where(d => d.ParentModuleId == selectedModuleId);
+        }
+
+        if (selectedActivityId > 0)
+        {
+            docs = docs.Where(d => d.ParentActivityId == selectedActivityId);
+        }
+        // SEARCH
+        filteredDocuments = docs.Where(d => 
             string.IsNullOrWhiteSpace(searchQuery) || 
             d.DisplayName.Contains(searchQuery, StringComparison.OrdinalIgnoreCase) || 
             d.Description.Contains(searchQuery, StringComparison.OrdinalIgnoreCase) ||
@@ -600,9 +620,9 @@
 
     private string GetEntityUrl(string type, int id) => type switch
     {
-        "Course" => $"/student/overview",
-        "Module" => $"/admin/modules/{id}/details",
-        "Activity" => $"/activities/{id}/details",
+        "Course" => isTeacher ? $"/admin/courses/{id}/details" : $"/student/overview",
+        "Module" => isTeacher ? $"/admin/modules/{id}/details" : $"/modules/{id}/details",
+        "Activity" => isTeacher ? $"/admin/activities/{id}/details" : $"/activities/{id}/details",
         _ => "#"
     };
 

@@ -94,7 +94,26 @@ public class MapperProfile : Profile
             .ForMember(dest => dest.UploadedByUserName, opt => opt.MapFrom(src => src.UploadedByUser!.UserName))
             .ForMember(dest => dest.CourseName, opt => opt.MapFrom(src => src.Course != null ? src.Course.Name : null))
             .ForMember(dest => dest.ModuleName, opt => opt.MapFrom(src => src.Module != null ? src.Module.Name : null))
-            .ForMember(dest => dest.ActivityName, opt => opt.MapFrom(src => src.Activity != null ? src.Activity.Name : null));
+            .ForMember(dest => dest.ActivityName, opt => opt.MapFrom(src => src.Activity != null ? src.Activity.Name : null))
+            // quick fix to populate parent IDs for easier handling on frontend, since documents can be attached to any level and we want to easily determine the context:
+            .ForMember(dest => dest.ParentCourseId, opt => opt.MapFrom(src =>
+                src.CourseId ??
+                (src.Module != null ? src.Module.CourseId :
+                src.Activity != null ? src.Activity.Module!.CourseId :
+                src.Submission != null ? src.Submission.Activity!.Module!.CourseId :
+                null)
+            ))
+            .ForMember(dest => dest.ParentModuleId, opt => opt.MapFrom(src =>
+                src.ModuleId ??
+                (src.Activity != null ? src.Activity.ModuleId :
+                src.Submission != null ? src.Submission.Activity!.ModuleId :
+                null)
+            ))
+            .ForMember(dest => dest.ParentActivityId, opt => opt.MapFrom(src =>
+                src.ActivityId ??
+                (src.Submission != null ? src.Submission.ActivityId :
+                null)
+            ));
 
         CreateMap<CreateDocumentDto, Document>()
             .ForMember(dest => dest.DisplayName, opt => opt.MapFrom(src => src.File.FileName))
