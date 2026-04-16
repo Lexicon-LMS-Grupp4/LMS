@@ -1,0 +1,158 @@
+﻿@using LMS.Shared.DTOs.User
+@inject IUserService UserService
+@using BlazorBlueprint.Components
+
+<BbCard Class="@Class">
+    <BbCardHeader Class="flex flex-row items-center justify-between space-y-0 pb-3">
+        <BbCardTitle Class="text-sm font-semibold">
+            <i class="bi bi-@(Role == "Teacher" ? "person-badge" : "people") me-2"></i>@ResolvedTitle
+        </BbCardTitle>
+        @if (!isLoading && users.Count > 0)
+        {
+            <BbBadge Variant="BadgeVariant.Secondary">@users.Count</BbBadge>
+        }
+    </BbCardHeader>
+
+    <BbCardContent Class="p-0">
+
+        @if (isLoading)
+        {
+            <div class="px-3 py-2 space-y-3">
+                @for (int i = 0; i < SkeletonCount; i++)
+                {
+                    <div class="flex items-center gap-3">
+                        <BbSkeleton Class="h-8 w-8 rounded-full flex-shrink-0" />
+                        <div class="flex-1 space-y-1">
+                            <BbSkeleton Class="h-3 w-3/4" />
+                            <BbSkeleton Class="h-3 w-1/2" />
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+
+        else if (loadError is not null)
+        {
+            <div class="px-3 py-3">
+                <BbAlert Variant="AlertVariant.Danger" Class="mb-0">
+                    <BbAlertDescription>@loadError</BbAlertDescription>
+                </BbAlert>
+            </div>
+        }
+
+        else if (!users.Any())
+        {
+            <p class="text-muted px-3 py-3 text-sm mb-0">@EmptyMessage</p>
+        }
+
+        else
+        {
+            var visible  = users.Take(MaxVisible).ToList();
+            var overflow = users.Count - visible.Count;
+
+            <BbScrollArea Class="max-h-[340px]">
+                <div class="divide-y">
+                    @foreach (var user in visible)
+                    {
+                        <div class="flex items-center gap-3 px-3 py-2">
+                            <BbAvatar Class="h-8 w-8 flex-shrink-0">
+                                <BbAvatarFallback Class="bg-primary/10 text-primary text-xs font-semibold">
+                                    @GetInitials(user.Name)
+                                </BbAvatarFallback>
+                            </BbAvatar>
+                            <div class="flex-1 overflow-hidden">
+                                <p class="text-sm font-semibold truncate mb-0">@user.Name</p>
+                                <p class="text-xs text-muted-foreground truncate mb-0">@user.Email</p>
+                            </div>
+                        </div>
+                    }
+
+                    @if (overflow > 0)
+                    {
+                        <p class="text-xs text-muted-foreground text-center py-2 mb-0">
+                            +@overflow more @(Role == "Teacher" ? "teacher" : "student")@(overflow > 1 ? "s" : "")
+                        </p>
+                    }
+                </div>
+            </BbScrollArea>
+        }
+
+    </BbCardContent>
+</BbCard>
+
+@code {
+    [Parameter, EditorRequired]
+    public int CourseId { get; set; }
+
+    [Parameter]
+    public string Role { get; set; } = "Student";
+
+    [Parameter]
+    public string? Title { get; set; }
+
+    [Parameter]
+    public int MaxVisible { get; set; } = 10;
+
+    [Parameter]
+    public int SkeletonCount { get; set; } = 4;
+
+    [Parameter]
+    public string? Class { get; set; }
+
+    private record UserDisplay(string Name, string Email);
+
+    private List<UserDisplay> users = [];
+    private bool isLoading;
+    private string? loadError;
+
+    private string ResolvedTitle => Title ?? (Role == "Teacher" ? "Teachers" : "Classmates");
+    private string AvatarClass   => Role == "Teacher" ? "bg-warning/10 text-warning" : "bg-primary/10 text-primary";
+    private string EmptyMessage  => Role == "Teacher" ? "No teachers assigned to this course yet." : "No other students enrolled yet.";
+
+    protected override async Task OnParametersSetAsync()
+        => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        if (CourseId <= 0)
+            return;
+
+        isLoading = true;
+        loadError = null;
+        StateHasChanged();
+
+        try
+        {
+            if (Role == "Teacher")
+            {
+                var result = await UserService.GetTeachersByCourseAsync(CourseId);
+                users = result?.Select(u => new UserDisplay(u.Name, u.Email)).ToList() ?? [];
+            }
+            else
+            {
+                var result = await UserService.GetUsersByCourseAsync(CourseId);
+                users = result?.Select(s => new UserDisplay(s.Name, s.Email)).ToList() ?? [];
+            }
+        }
+        catch (Exception ex)
+        {
+            loadError = $"Could not load {ResolvedTitle.ToLower()}. {ex.Message}";
+            users = [];
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private static string GetInitials(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            return "?";
+
+        var parts = name.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length >= 2
+            ? $"{parts[0][0]}{parts[^1][0]}".ToUpper()
+            : parts[0][0].ToString().ToUpper();
+    }
+}

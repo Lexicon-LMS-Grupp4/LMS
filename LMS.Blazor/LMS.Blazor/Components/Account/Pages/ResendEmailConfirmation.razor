@@ -14,25 +14,65 @@
 
 <PageTitle>Resend email confirmation</PageTitle>
 
-<h1>Resend email confirmation</h1>
-<h2>Enter your email.</h2>
-<hr />
-<StatusMessage Message="@message" />
-<div class="row">
-    <div class="col-md-4">
-        <EditForm Model="Input" FormName="resend-email-confirmation" OnValidSubmit="OnValidSubmitAsync" method="post">
-            <DataAnnotationsValidator />
-            <ValidationSummary class="text-danger" role="alert" />
-            <div class="form-floating mb-3">
-                <InputText @bind-Value="Input.Email" id="Input.Email" class="form-control" aria-required="true" placeholder="name@example.com" />
-                <label for="Input.Email" class="form-label">Email</label>
-                <ValidationMessage For="() => Input.Email" class="text-danger" />
+<div class="mb-4 text-center">
+    <h1 class="display-4 fw-bold">Lexicon LMS</h1>
+    <p class="lead text-muted">Learning Platform</p>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-lg-5 col-md-7">
+
+        <div class="card shadow border-0">
+            <div class="card-body p-4">
+
+                <StatusMessage Message="@message" />
+
+                <EditForm Model="Input"
+                          FormName="resend-email-confirmation"
+                          OnValidSubmit="OnValidSubmitAsync"
+                          method="post">
+
+                    <DataAnnotationsValidator />
+
+                    <p class="text-muted mb-4 text-center">
+                        Enter your email to receive a new confirmation link.
+                    </p>
+
+                    <ValidationSummary class="text-danger" role="alert" />
+
+                    <div class="form-floating mb-4">
+                        <InputText @bind-Value="Input.Email"
+                                   id="Input.Email"
+                                   class="form-control"
+                                   placeholder="name@example.com" />
+                        <label for="Input.Email">Email</label>
+                        <ValidationMessage For="() => Input.Email" class="text-danger" />
+                    </div>
+
+                    <button type="submit" class="w-100 btn btn-primary btn-lg">
+                        Resend confirmation
+                    </button>
+
+                    <hr />
+
+                    <div class="text-center small">
+                        <a href="/Account/Login">Back to login</a>
+                    </div>
+
+                </EditForm>
+
             </div>
-            <button type="submit" class="w-100 btn btn-lg btn-primary">Resend</button>
-        </EditForm>
+        </div>
+
     </div>
 </div>
 
+<style>
+    main {
+        background-color: #ececec;
+    }
+
+</style>
 @code {
     private string? message;
 

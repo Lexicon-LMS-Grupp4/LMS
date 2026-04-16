@@ -1,0 +1,76 @@
+﻿@using LMS.Shared.DTOs.ActivityType
+@using BlazorBlueprint.Components
+
+<BbDialog Open="@Open" OpenChanged="@OnOpenChanged">
+    <BbDialogContent>
+        <BbDialogHeader>
+            <BbDialogTitle>Add Activity Type</BbDialogTitle>
+            <BbDialogDescription>
+                Create a new activity type and select it for this activity.
+            </BbDialogDescription>
+        </BbDialogHeader>
+
+        <div class="d-flex flex-column gap-3 py-3">
+            @if (!string.IsNullOrWhiteSpace(Error))
+            {
+                <BbAlert Variant="AlertVariant.Danger" Class="mb-0">
+                    @Error
+                </BbAlert>
+            }
+
+            <BbInput Class="mb-2"
+                     Value="@Name"
+                     ValueChanged="@(async (string v) => await NameChanged.InvokeAsync(v))"
+                     Placeholder="e.g. Quiz, Workshop, Exam" />
+            <BbTextarea Value="@Description"
+                        ValueChanged="@(async (string v) => await DescriptionChanged.InvokeAsync(v))"
+                        Placeholder="e.g. Description..." />
+        </div>
+
+        <BbDialogFooter>
+            <BbButton Variant="ButtonVariant.Outline"
+                      OnClick="HandleCancel">
+                Cancel
+            </BbButton>
+
+            <BbButton OnClick="HandleSave"
+                      Disabled="IsSaving">
+                @(IsSaving ? "Saving..." : "Save")
+            </BbButton>
+        </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
+
+@code {
+    [Parameter] public bool Open { get; set; }
+    [Parameter] public EventCallback<bool> OpenChanged { get; set; }
+
+    [Parameter] public string Name { get; set; } = string.Empty;
+    [Parameter] public EventCallback<string> NameChanged { get; set; }
+
+    [Parameter] public string Description { get; set; } = string.Empty;
+    [Parameter] public EventCallback<string> DescriptionChanged { get; set; }
+
+    [Parameter] public string? Error { get; set; }
+    [Parameter] public bool IsSaving { get; set; }
+
+    [Parameter] public EventCallback OnSave { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+
+    private async Task OnOpenChanged(bool value)
+    {
+        Open = value;
+        await OpenChanged.InvokeAsync(value);
+    }
+
+    private async Task HandleCancel()
+    {
+        await OnOpenChanged(false);
+        await OnCancel.InvokeAsync();
+    }
+
+    private async Task HandleSave()
+    {
+        await OnSave.InvokeAsync();
+    }
+}

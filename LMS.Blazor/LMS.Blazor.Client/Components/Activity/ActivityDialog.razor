@@ -1,0 +1,192 @@
+﻿@using LMS.Shared.DTOs.Activity
+@using LMS.Shared.DTOs.ActivityType
+@using BlazorBlueprint.Components
+@using LMS.Shared.DTOs.Course
+@using LMS.Shared.DTOs.Module
+
+<BbDialog Open="@Open" OpenChanged="@OnOpenChanged">
+    <BbDialogContent>
+        <BbDialogHeader>
+            <BbDialogTitle>@(IsEditing ? "Edit Activity" : "Create Activity")</BbDialogTitle>
+            <BbDialogDescription>
+                @(IsEditing ? "Update the activity details below." : "Fill in details for the new activity.")
+            </BbDialogDescription>
+        </BbDialogHeader>
+
+        <div class="d-flex flex-column gap-3 py-3">
+            @if (!string.IsNullOrEmpty(validationError))
+            {
+                <BbAlert Variant="AlertVariant.Danger" Class="mb-0">@validationError</BbAlert>
+            }
+
+            @if (!string.IsNullOrEmpty(ActivityTypeError))
+            {
+                <BbAlert Variant="AlertVariant.Danger" Class="mb-0">@ActivityTypeError</BbAlert>
+            }
+
+            @* Course / Module selectors — hidden when context is already known (e.g. ModuleDetails) *@
+            @if (!HideModuleSelection)
+            {
+                <div>
+                    <label class="form-label fw-medium" style="font-size:0.85rem;">Course</label>
+                    <select class="form-select"
+                            value="@Model.CourseId"
+                            @onchange="HandleCourseChanged">
+                        <option value="0">Select active course</option>
+                        @foreach (var course in Courses)
+                        {
+                            <option value="@course.Id">@course.Name</option>
+                        }
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label fw-medium" style="font-size:0.85rem;">Module</label>
+                    <select class="form-select" @bind="Model.ModuleId" disabled="@(Model.CourseId <= 0 || !Modules.Any())">
+                        <option value="0">Select module</option>
+                        @foreach (var module in Modules)
+                        {
+                            <option value="@module.Id">@module.Name</option>
+                        }
+                    </select>
+                </div>
+            }
+
+            <div>
+                <label class="form-label fw-medium" style="font-size:0.85rem;">Name</label>
+                <BbInput @bind-Value="Model.Name" Placeholder="e.g. Lecture 1" />
+            </div>
+
+            <div>
+                <label class="form-label fw-medium" style="font-size:0.85rem;">Description</label>
+                <BbTextarea @bind-Value="Model.Description" Placeholder="Optional description..." Rows="3" />
+            </div>
+
+            <ActivityTypeSelector ActivityTypes="ActivityTypes"
+                                  @bind-SelectedActivityTypeId="Model.ActivityTypeId"
+                                  OnAddClicked="OnAddActivityType"
+                                  OnDeleteClicked="OnDeleteActivityType" />
+
+            <div class="row g-2">
+                <div class="col-6">
+                    <label class="form-label fw-medium" style="font-size:0.85rem;">Start</label>
+                    <BbInput Value="@Model.StartTime?.ToString("yyyy-MM-ddTHH:mm")"
+                             ValueChanged="@((string v) => Model.StartTime = string.IsNullOrEmpty(v) ? null : DateTime.Parse(v))"
+                             Style="width:100%;" />
+                </div>
+                <div class="col-6">
+                    <label class="form-label fw-medium" style="font-size:0.85rem;">End / Deadline</label>
+                    <BbInput Value="@Model.EndTime.ToString("yyyy-MM-ddTHH:mm")"
+                             ValueChanged="@((string v) => { if (!string.IsNullOrEmpty(v)) Model.EndTime = DateTime.Parse(v); })"
+                             Style="width:100%;" />
+                </div>
+            </div>
+        </div>
+
+        <BbDialogFooter>
+            <BbButton Variant="ButtonVariant.Outline" OnClick="HandleCancel">Cancel</BbButton>
+            <BbButton OnClick="HandleSave">@(IsEditing ? "Save Changes" : "Create")</BbButton>
+        </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
+
+@code {
+    [Parameter] public bool Open { get; set; }
+    [Parameter] public EventCallback<bool> OpenChanged { get; set; }
+    [Parameter] public bool IsEditing { get; set; }
+
+    /// <summary>
+    /// When true, hides the Course/Module dropdowns and skips their validation.
+    /// Use this when the module context is already known (e.g. inside ModuleDetails or ActivityDetails).
+    /// </summary>
+    [Parameter] public bool HideModuleSelection { get; set; }
+
+    [Parameter, EditorRequired] public ActivityFormModel Model { get; set; } = default!;
+    [Parameter] public List<ActivityTypeDto> ActivityTypes { get; set; } = [];
+    [Parameter] public EventCallback OnSave { get; set; }
+    [Parameter] public List<CourseDto> Courses { get; set; } = [];
+    [Parameter] public List<ModuleDto> Modules { get; set; } = [];
+    [Parameter] public EventCallback<int> OnCourseChanged { get; set; }
+    [Parameter] public EventCallback OnAddActivityType { get; set; }
+    [Parameter] public EventCallback<int> OnDeleteActivityType { get; set; }
+    [Parameter] public string? ActivityTypeError { get; set; }
+
+    private string? validationError;
+
+    private async Task HandleSave()
+    {
+        validationError = null;
+
+        if (string.IsNullOrWhiteSpace(Model.Name))
+        {
+            validationError = "Name is required.";
+            return;
+        }
+
+        // Only validate course/module when the dropdowns are visible
+        if (!HideModuleSelection)
+        {
+            if (Model.CourseId <= 0)
+            {
+                validationError = "Please select an active course.";
+                return;
+            }
+            if (Model.ModuleId <= 0)
+            {
+                validationError = "Please select a module.";
+                return;
+            }
+        }
+
+        if (Model.ActivityTypeId <= 0)
+        {
+            validationError = "Please select an activity type.";
+            return;
+        }
+        if (Model.EndTime == default)
+        {
+            validationError = "End time is required.";
+            return;
+        }
+        if (Model.StartTime.HasValue && Model.EndTime <= Model.StartTime)
+        {
+            validationError = "End time must be after start time.";
+            return;
+        }
+
+        await OnSave.InvokeAsync();
+    }
+
+    private async Task HandleCourseChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var courseId))
+        {
+            Model.CourseId = courseId;
+            Model.ModuleId = 0;
+            await OnCourseChanged.InvokeAsync(courseId);
+        }
+    }
+
+    private async Task OnOpenChanged(bool value)
+    {
+        Open = value;
+        validationError = null;
+        await OpenChanged.InvokeAsync(value);
+    }
+
+    private async Task HandleCancel()
+    {
+        validationError = null;
+        await OnOpenChanged(false);
+    }
+
+    public class ActivityFormModel
+    {
+        public int CourseId { get; set; }
+        public int ModuleId { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public int ActivityTypeId { get; set; }
+        public DateTime? StartTime { get; set; } = DateTime.Today.AddHours(9);
+        public DateTime EndTime { get; set; } = DateTime.Today.AddHours(11);
+    }
+}

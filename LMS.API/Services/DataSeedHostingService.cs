@@ -1,5 +1,4 @@
 using Bogus;
-using Domain.Models.Enums;
 using LMS.Infractructure.Data;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -51,13 +50,15 @@ public class DataSeedHostingService : IHostedService
             {
                 await AddRolesAsync([TeacherRole, StudentRole]);
 
+                var activityTypes = await SeedActivityTypesAsync();
+
                 var courses = FakeCourses(5);
                 await AddCoursesToDb(courses);
 
                 var modules = FakeModules(2, 7, courses);
                 await AddModulesToDb(modules);
 
-                var activities = FakeActivities(modules);
+                var activities = FakeActivities(modules, activityTypes);
                 await AddActivitiesToDb(activities);
 
                 await AddDemoUsersAsync(courses);
@@ -103,6 +104,26 @@ public class DataSeedHostingService : IHostedService
 
             if (!res.Succeeded) throw new Exception(string.Join("\n", res.Errors));
         }
+    }
+
+    private async Task<List<ActivityType>> SeedActivityTypesAsync()
+    {
+        if (await dbContext.ActivityTypes.AnyAsync())
+            return await dbContext.ActivityTypes.ToListAsync();
+
+        var types = new List<ActivityType>
+        {
+            new() { Name = "Lecture",    Description = "Instructor-led presentation or talk" },
+            new() { Name = "Exercise",   Description = "Practical hands-on coding or problem-solving session" },
+            new() { Name = "Assignment", Description = "Take-home task submitted by a deadline" },
+            new() { Name = "E-Learning", Description = "Self-paced online content or video material" },
+            new() { Name = "Other",      Description = "Seminar, discussion, or any other activity format" }
+        };
+
+        await dbContext.ActivityTypes.AddRangeAsync(types);
+        await dbContext.SaveChangesAsync();
+
+        return types;
     }
     private async Task AddDemoUsersAsync(IEnumerable<Course> courses)
     {
@@ -273,10 +294,9 @@ public class DataSeedHostingService : IHostedService
 
         await dbContext.SaveChangesAsync();
     }
-    private IEnumerable<Domain.Models.Entities.Activity> FakeActivities(IEnumerable<Module> modules)
+    private IEnumerable<Activity> FakeActivities(IEnumerable<Module> modules, List<ActivityType> activityTypes)
     {
-        var activities = new List<Domain.Models.Entities.Activity>();
-
+        var activities = new List<Activity>();
         var textFaker = new Faker("sv");
 
         foreach (var module in modules)
@@ -285,15 +305,15 @@ public class DataSeedHostingService : IHostedService
 
             while (compareTime < module.EndDate)
             {
-                var type = textFaker.PickRandom<ActivityType>();
-                var (activityStart, activityEnd) = FakeActivityTimes(type, compareTime);
+                var activityType = textFaker.PickRandom(activityTypes);
+                var (activityStart, activityEnd) = FakeActivityTimes(activityType.Name, compareTime);
                 compareTime = activityEnd;
 
-                activities.Add(new Domain.Models.Entities.Activity
+                activities.Add(new Activity
                 {
                     ModuleId = module.Id,
-                    Name = FakeActivityName(type, textFaker),
-                    Type = type,
+                    ActivityTypeId = activityType.Id,
+                    Name = FakeActivityName(activityType.Name, textFaker),
                     Description = textFaker.Lorem.Paragraph(random.Next(1, 3)),
                     StartTime = activityStart,
                     EndTime = activityEnd
@@ -304,79 +324,62 @@ public class DataSeedHostingService : IHostedService
         return activities;
     }
 
-    private (DateTime?, DateTime) FakeActivityTimes(ActivityType type, DateTime afterTime)
+    private (DateTime?, DateTime) FakeActivityTimes(string typeName, DateTime afterTime)
     {
         var startTime = EnsureWeekday(afterTime.AddDays(random.Next(1, 3)));
-        return type switch
+        return typeName switch
         {
-            ActivityType.Lecture => (WithHour(9, startTime), WithHour(12, startTime)),
-            ActivityType.Exercise => (WithHour(10, startTime), WithHour(15, startTime)),
-            ActivityType.Assignment => (null, EnsureWeekday(afterTime.AddDays(random.Next(1, 5)))),
-            ActivityType.ELearning => (null, EnsureWeekday(afterTime.AddDays(random.Next(1, 5)))),
+            "Lecture" => (WithHour(9, startTime), WithHour(12, startTime)),
+            "Exercise" => (WithHour(10, startTime), WithHour(15, startTime)),
+            "Assignment" => (null, EnsureWeekday(afterTime.AddDays(random.Next(1, 5)))),
+            "E-Learning" => (null, EnsureWeekday(afterTime.AddDays(random.Next(1, 5)))),
             _ => (WithHour(9, startTime), WithHour(17, startTime))
         };
     }
 
-    private string FakeActivityName(ActivityType type, Faker textFaker)
+    private string FakeActivityName(string typeName, Faker textFaker)
     {
-        return type switch
+        return typeName switch
         {
-            ActivityType.Lecture => textFaker.PickRandom(new[]
+            "Lecture" => textFaker.PickRandom(new[]
             {
-                "Introduktion till ämnet",
-                "Genomgång av grunder",
-                "Fördjupning i koncept",
-                "Teori och principer"
+                "Introduktion till ämnet", "Genomgång av grunder",
+                "Fördjupning i koncept",   "Teori och principer"
             }),
-
-            ActivityType.Exercise => textFaker.PickRandom(new[]
+            "Exercise" => textFaker.PickRandom(new[]
             {
-                "Praktisk övning",
-                "Kodövning",
-                "Workshop",
-                "Parprogrammering"
+                "Praktisk övning", "Kodövning",
+                "Workshop",        "Parprogrammering"
             }),
-
-            ActivityType.Assignment => textFaker.PickRandom(new[]
+            "Assignment" => textFaker.PickRandom(new[]
             {
-                "Inlämningsuppgift 1",
-                "Projektuppgift",
-                "Hemuppgift",
-                "Case study"
+                "Inlämningsuppgift 1", "Projektuppgift",
+                "Hemuppgift",          "Case study"
             }),
-
-            ActivityType.ELearning => textFaker.PickRandom(new[]
+            "E-Learning" => textFaker.PickRandom(new[]
             {
-                "Onlinekurs",
-                "Videogenomgång",
-                "Självstudier",
-                "Interaktiv modul"
+                "Onlinekurs", "Videogenomgång",
+                "Självstudier", "Interaktiv modul"
             }),
-
             _ => textFaker.PickRandom(new[]
             {
-                "Seminarium",
-                "Diskussion",
-                "Övrig aktivitet"
+                "Seminarium", "Diskussion", "Övrig aktivitet"
             })
         };
     }
 
-    private async Task AddActivitiesToDb(IEnumerable<Domain.Models.Entities.Activity> activities)
+    private async Task AddActivitiesToDb(IEnumerable<Activity> activities)
     {
         if (dbContext is null)
-        {
             throw new InvalidOperationException("DbContext is not initialized");
-        }
+
         foreach (var activity in activities)
         {
-            bool exists = await dbContext.Modules
-                .AnyAsync(c => c.Name == activity.Name);
+            bool exists = await dbContext.Activities
+                .AnyAsync(a => a.Name == activity.Name && a.ModuleId == activity.ModuleId);
 
             if (!exists)
-            {
                 await dbContext.Activities.AddAsync(activity);
-            }
         }
 
         await dbContext.SaveChangesAsync();

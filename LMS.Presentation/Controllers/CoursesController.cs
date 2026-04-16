@@ -1,4 +1,5 @@
 ﻿using LMS.Shared.DTOs.Course;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Service.Contracts;
@@ -8,13 +9,11 @@ namespace LMS.Presentation.Controllers;
 
 [Route("api/courses")]
 [ApiController]
-public class CoursesController : ControllerBase
+[Authorize]
+public class CoursesController : LmsControllerBase
 {
-    private readonly IServiceManager serviceManager;
-
-    public CoursesController(IServiceManager serviceManager)
+    public CoursesController(IServiceManager serviceManager) : base(serviceManager)
     {
-        this.serviceManager = serviceManager;
     }
 
     [HttpGet]
@@ -23,9 +22,10 @@ public class CoursesController : ControllerBase
         Description = "Retrieves a paginated list of all courses"
     )]
     [SwaggerResponse(StatusCodes.Status200OK, "Courses retrieved successfully")]
+    [AllowAnonymous]
     public async Task<IActionResult> GetAllCourses([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
     {
-        var result = await serviceManager.CourseService.GetAllCoursesAsync(page, pageSize);
+        var result = await serviceManager.CourseService.GetAllCoursesAsync(UserId, page, pageSize);
         return Ok(result);
     }
 
@@ -36,9 +36,10 @@ public class CoursesController : ControllerBase
     )]
     [SwaggerResponse(StatusCodes.Status200OK, "Course retrieved successfully")]
     [SwaggerResponse(StatusCodes.Status404NotFound, "Course not found")]
+    [AllowAnonymous]
     public async Task<IActionResult> GetCourseById(int id)
     {
-        var course = await serviceManager.CourseService.GetCourseByIdAsync(id);
+        var course = await serviceManager.CourseService.GetCourseByIdAsync(id, UserId);
         return Ok(course);
     }
 
@@ -49,9 +50,10 @@ public class CoursesController : ControllerBase
     )]
     [SwaggerResponse(StatusCodes.Status200OK, "Course details retrieved successfully")]
     [SwaggerResponse(StatusCodes.Status404NotFound, "Course not found")]
+    [SwaggerResponse(StatusCodes.Status403Forbidden, "Forbidden")]
     public async Task<IActionResult> GetCourseDetail(int id)
     {
-        var course = await serviceManager.CourseService.GetCourseDetailByIdAsync(id);
+        var course = await serviceManager.CourseService.GetCourseDetailByIdAsync(id, UserId);
         return Ok(course);
     }
 
@@ -62,9 +64,10 @@ public class CoursesController : ControllerBase
     )]
     [SwaggerResponse(StatusCodes.Status201Created, "Course created successfully")]
     [SwaggerResponse(StatusCodes.Status400BadRequest, "Invalid input")]
+    [SwaggerResponse(StatusCodes.Status403Forbidden, "Forbidden")]
     public async Task<IActionResult> CreateCourse([FromBody] CreateCourseDto dto)
     {
-        var course = await serviceManager.CourseService.CreateCourseAsync(dto);
+        var course = await serviceManager.CourseService.CreateCourseAsync(UserId, dto);
         return CreatedAtAction(nameof(GetCourseById), new { id = course.Id }, course);
     }
 
@@ -75,9 +78,10 @@ public class CoursesController : ControllerBase
     )]
     [SwaggerResponse(StatusCodes.Status200OK, "Course updated successfully")]
     [SwaggerResponse(StatusCodes.Status404NotFound, "Course not found")]
+    [SwaggerResponse(StatusCodes.Status403Forbidden, "Forbidden")]
     public async Task<IActionResult> UpdateCourse(int id, [FromBody] UpdateCourseDto dto)
     {
-        await serviceManager.CourseService.UpdateCourseAsync(id, dto);
+        await serviceManager.CourseService.UpdateCourseAsync(id, UserId, dto);
         return Ok(new { message = "Course updated successfully" });
     }
 
@@ -88,9 +92,10 @@ public class CoursesController : ControllerBase
     )]
     [SwaggerResponse(StatusCodes.Status200OK, "Course deleted successfully")]
     [SwaggerResponse(StatusCodes.Status404NotFound, "Course not found")]
+    [SwaggerResponse(StatusCodes.Status403Forbidden, "Forbidden")]
     public async Task<IActionResult> DeleteCourse(int id)
     {
-        await serviceManager.CourseService.DeleteCourseAsync(id);
+        await serviceManager.CourseService.DeleteCourseAsync(id, UserId);
         return Ok(new { message = "Course deleted successfully" });
     }
 }

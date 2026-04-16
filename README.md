@@ -1,6 +1,6 @@
 # .NET LMS student project
 
-## Definition of Done (WIP)
+## Definition of Done
 - [ ] Code builds successfully without errors
 - [ ] Relevant functionality is tested manually (happy path + basic edge cases)
 - [ ] No obvious bugs or broken flows in the UI
@@ -13,76 +13,74 @@
 ## Database Schema
 ```mermaid
 erDiagram
-    APPLICATIONUSER {
-        string Id "<+ IdentityUser fields>"
+    ApplicationUser ||--o{ Submission : submits
+    ApplicationUser ||--o{ SubmissionComment : writes
+    ApplicationUser ||--o{ Document : uploads
+    ApplicationUser ||--o{ CourseTeacher : teaches
+
+    Course ||--o{ Module : contains
+    Course ||--o{ ApplicationUser : has_students
+    Course ||--o{ CourseTeacher : has_teachers
+    Course ||--o{ Document : has
+
+    Module ||--o{ Activity : contains
+    Module ||--o{ Document : has
+
+    ActivityType ||--o{ Activity : classifies
+
+    Activity ||--o{ Submission : receives
+    Activity ||--o{ Document : has
+
+    Submission ||--o{ SubmissionComment : has
+    Submission ||--|| Document : may_have
+
+    ApplicationUser {
+        string Id PK
         int CourseId FK
     }
 
-    COURSE {
+    Course {
         int Id PK
-        string Name
-        string Description
-        datetime StartDate
     }
 
-    MODULE {
+    CourseTeacher {
+        int CourseId PK, FK
+        string TeacherId PK, FK
+    }
+
+    Module {
         int Id PK
         int CourseId FK
-        string Name
-        string Description
-        datetime StartDate
-        datetime EndDate
     }
 
-    ACTIVITY {
+    Activity {
         int Id PK
         int ModuleId FK
-        string Name
-        string Description
-        string Type
-        datetime StartTime
-        datetime EndTime
+        int ActivityTypeId FK
     }
 
-    DOCUMENT {
+    ActivityType {
         int Id PK
-        string FileName
-        string DisplayName
-        string Description
-        datetime UploadedAt
-        string UploadedByUserId FK
+    }
+
+    Submission {
+        int Id PK
+        int ActivityId FK
+        string StudentId FK
+    }
+
+    SubmissionComment {
+        int Id PK
+        int SubmissionId FK
+        string AuthorId FK
+    }
+
+    Document {
+        int Id PK
         int CourseId FK
         int ModuleId FK
         int ActivityId FK
         int SubmissionId FK
+        string UploadedByUserId FK
     }
-
-    SUBMISSION {
-        int Id PK
-        string StudentId FK
-        int ActivityId FK
-        string Body
-        datetime SubmittedAt
-        bool IsLate
-        string FeedbackText
-        datetime FeedbackGivenAt
-    }
-
-    COURSETEACHER {
-        int CourseId PK, FK
-        int TeacherId PK, FK
-    }
-
-    COURSE ||--o{ MODULE : has
-    MODULE ||--o{ ACTIVITY : has
-    COURSE ||--o{ APPLICATIONUSER : has_students
-    APPLICATIONUSER ||--o{ DOCUMENT : uploads
-    COURSE ||--o{ DOCUMENT : contains
-    MODULE ||--o{ DOCUMENT : contains
-    ACTIVITY ||--o{ DOCUMENT : contains
-    APPLICATIONUSER ||--o{ SUBMISSION : makes
-    DOCUMENT ||--o| SUBMISSION : attached_to
-    APPLICATIONUSER ||--o{ SUBMISSION : reviews
-    COURSE ||--o{ COURSETEACHER : has
-    APPLICATIONUSER ||--o{ COURSETEACHER : teaches_in
 ```

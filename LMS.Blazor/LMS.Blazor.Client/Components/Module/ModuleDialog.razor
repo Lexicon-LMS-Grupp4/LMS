@@ -1,4 +1,5 @@
 @using LMS.Shared.DTOs.Module
+@using LMS.Blazor.Client.Helpers
 @using BlazorBlueprint.Icons.Lucide.Components
 @using BlazorBlueprint.Icons.Lucide.Data
 @using BlazorBlueprint.Icons.Lucide
@@ -12,65 +13,116 @@
             </BbDialogDescription>
         </BbDialogHeader>
 
-        <div class="d-flex flex-column gap-3 py-3">
-            @if (!string.IsNullOrEmpty(validationError))
+        <div class="d-flex flex-column gap-2 py-1 px-1" style="max-height: 80vh; overflow-y: hidden; overflow-x: hidden;">
+            @if (Module != null)
             {
-                <BbAlert Variant="AlertVariant.Danger" Class="mb-0">
-                    @validationError
-                </BbAlert>
-            }
-            <div>
-                <label class="form-label fw-medium" style="font-size:0.85rem;">Module Name</label>
-                <BbInput @bind-Value="Module.Name" Placeholder="e.g. Core C# Programming" />
-            </div>
-            <div>
-                <label class="form-label fw-medium" style="font-size:0.85rem;">Description</label>
-                <BbTextarea @bind-Value="Module.Description"
-                            Placeholder="Brief overview of what this module covers..." Rows="3" />
-            </div>
+                @if (!string.IsNullOrEmpty(validationError))
+                {
+                    <BbAlert Variant="AlertVariant.Danger" Class="py-1 px-3 mb-1" Style="font-size:0.75rem;">
+                        @validationError
+                    </BbAlert>
+                }
+                <div class="row g-2">
+                    <div class="col-12">
+                        <label class="form-label fw-medium mb-1" style="font-size:0.75rem;">Module Name</label>
+                        <BbInput @bind-Value="Module.Name" Placeholder="e.g. Core C# Programming" />
+                    </div>
+                </div>
 
-            <div>
-                <label class="form-label fw-medium mb-2" style="font-size:0.85rem;">Module Icon</label>
-                @* -- Icon Selection Grid -- *@
-                <div class="d-flex flex-wrap gap-2 p-3 border rounded-3 bg-light" style="max-height: 160px; overflow-y: auto;">
-                    @foreach (var icon in availableIcons)
-                    {
-                        <BbButton Variant="@(Module.Icon == icon ? ButtonVariant.Default : ButtonVariant.Ghost)"
-                                  Size="ButtonSize.Small"
-                                  Style="width:50px;height:50px;padding:0;display:flex;align-items:center;justify-content:center;"
-                                  OnClick="@(() => Module.Icon = icon)">
-                            <LucideIcon Name="@icon" Size="24" />
-                        </BbButton>
-                    }
+                <div class="mt-2">
+                    <label class="form-label fw-medium mb-1" style="font-size:0.75rem;">Icon Selection</label>
+                    <div class="mt-1 mb-2 px-2 small text-muted d-flex align-items-center gap-2">
+                        <span>Current:</span>
+                        <LucideIcon Name="@(string.IsNullOrEmpty(Module.Icon) ? "book-open" : Module.Icon)" 
+                                   Size="20" 
+                                   Style="color: #2563eb;" />
+                        <span class="fw-bold">@(string.IsNullOrEmpty(Module.Icon) ? "book-open" : Module.Icon)</span>
+                    </div>
+
+                    <div class="d-flex flex-wrap gap-1 p-2 border rounded bg-light" style="max-height: 200px; overflow-y: auto;">
+                        @foreach (var icon in availableIcons)
+                        {
+                            <div @key="icon" 
+                                 class="d-flex align-items-center justify-content-center rounded cursor-pointer transition-all shadow-sm"
+                                 style="@($"width:44px; height:44px; border: 1px solid {(Module.Icon == icon ? "#2563eb" : "#e2e8f0")}; background-color: {(Module.Icon == icon ? "#2563eb" : "white")}; cursor: pointer;")"
+                                 @onclick="@(() => Module.Icon = icon)"
+                                 title="@icon">
+                                <LucideIcon Name="@icon" 
+                                           Size="24" 
+                                           Style="@($"color: {(Module.Icon == icon ? "white" : "#475569")};")" />
+                            </div>
+                        }
+                    </div>
                 </div>
-            </div>
-            <div class="row g-2">
-                <div class="col-6">
-                    <label class="form-label fw-medium" style="font-size:0.85rem;">Start Date</label>
-                    <BbInput Value="@Module.StartDate.ToString("yyyy-MM-dd")"
-                             ValueChanged="@((string v) => { Module.StartDate = DateTime.Parse(v); validationError = null; })"
-                             Style="width:100%;" />
-                     @* -- Guide text for Course constraints -- *@
-                     @if (CourseStartDate.HasValue)
-                     {
-                         <div class="form-text mt-1" style="font-size: 0.75rem;">
-                             Course starts: @CourseStartDate.Value.ToString("MMM dd, yyyy")
-                         </div>
-                     }
+
+                <div>
+                    <label class="form-label fw-medium mb-1" style="font-size:0.75rem;">Description</label>
+                    <BbTextarea @bind-Value="Module.Description"
+                                Placeholder="Brief overview..." Rows="1" Style="min-height: 40px; font-size: 0.8rem;" />
                 </div>
-                <div class="col-6">
-                    <label class="form-label fw-medium" style="font-size:0.85rem;">End Date</label>
-                    <BbInput Value="@(Module.EndDate.ToString("yyyy-MM-dd") ?? "")"
-                             ValueChanged="@((string v) => { Module.EndDate = string.IsNullOrEmpty(v) ? Module.StartDate : DateTime.Parse(v); validationError = null; })"
-                             Style="width:100%;" />
+
+                <div class="row g-2 align-items-end">
+                    <div class="col-md-6">
+                        <label class="form-label fw-medium mb-1" style="font-size:0.75rem;">Start Date</label>
+                        <BbDatePicker @bind-Value="startDate"
+                                      Culture="@(new System.Globalization.CultureInfo("sv-SE"))"
+                                      DisabledDates="IsDateDisabled"
+                                      Class="custom-datepicker w-100" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-medium mb-1" style="font-size:0.75rem;">End Date</label>
+                        <BbDatePicker @bind-Value="endDate"
+                                      Culture="@(new System.Globalization.CultureInfo("sv-SE"))"
+                                      DisabledDates="IsDateDisabled"
+                                      Class="custom-datepicker w-100" />
+                    </div>
                 </div>
-            </div>
+
+                @* -- Legend -- *@
+                <div class="d-flex justify-content-between align-items-center px-1 py-1 bg-light border-0 rounded" style="font-size: 0.65rem; margin-top: 2px;">
+                    <div class="text-muted d-flex align-items-center gap-1">
+                        <i class="bi bi-calendar-check" style="font-size:14px;"></i>
+                        @if (CourseStartDate.HasValue)
+                        {
+                            <span>Course Starts: <b class="text-dark">@CourseStartDate.Value.ToString("yyyy-MM-dd")</b></span>
+                        }
+                    </div>
+                    <div class="d-flex gap-2 fw-medium">
+                        <span class="d-flex align-items-center gap-1"><span class="dot overlap-dot"></span> Overlap</span>
+                        <span class="d-flex align-items-center gap-1"><span class="dot weekend-dot"></span> Weekend</span>
+                    </div>
+                </div>
+            }
         </div>
 
-        <BbDialogFooter>
-            <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => Open = false)">Cancel</BbButton>
-            <BbButton OnClick="HandleSave">@(IsEditing ? "Save Changes" : "Create Module")</BbButton>
+        <BbDialogFooter Class="pt-1 mt-1 border-top-0">
+            <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" OnClick="@(() => Open = false)">Cancel</BbButton>
+            <BbButton Size="ButtonSize.Small" OnClick="HandleSave">@(IsEditing ? "Save Changes" : "Create Module")</BbButton>
         </BbDialogFooter>
+
+        <style>
+            .custom-datepicker .bb-datepicker-header { display: flex !important; justify-content: center !important; height: 40px !important; align-items: center !important; }
+            .custom-datepicker .bb-datepicker-popover { min-height: 300px !important; }
+            
+            /* Dot styling for the legend */
+            .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+            .overlap-dot { background: #fd7e14; } /* Bright Orange */
+            .weekend-dot { background: #adb5bd; } /* Gray */
+
+            /* Calendar Day Indicators - Using a border and a dot */
+            .date-overlap { box-shadow: inset 0 -3px 0 0 #fd7e14 !important; }
+            
+            .custom-datepicker .disabled, .custom-datepicker [disabled] {
+                background-color: #f1f5f9 !important;
+                color: #94a3b8 !important;
+                text-decoration: line-through !important;
+                cursor: not-allowed !important;
+                opacity: 0.6 !important;
+            }
+
+            /* Ensure icons stand out */
+            .bi { vertical-align: middle; line-height: 1; }
+        </style>
     </BbDialogContent>
 </BbDialog>
 
@@ -79,47 +131,95 @@
     [Parameter] public EventCallback<bool> OpenChanged { get; set; }
     [Parameter] public bool IsEditing { get; set; }
     [Parameter] public DateTime? CourseStartDate { get; set; }
+    [Parameter] public List<ModuleDto> ExistingModules { get; set; } = [];
     [Parameter, EditorRequired] public ModuleDto Module { get; set; } = default!;
     [Parameter] public EventCallback OnSave { get; set; }
 
     private string? validationError;
+    private string[] availableIcons = [
+        "book-open", "graduation-cap", "school", "library", "pencil", 
+        "book", "clipboard-check", "calculator", "microscope", "flask-conical", 
+        "music", "palette", "languages", "brain", 
+        "lightbulb", "presentation", "ruler", "shapes", "trophy", 
+        "medal", "landmark", "microchip", "binary", "rocket", 
+        "database", "layers", "shield", "plug", 
+        "code", "layout", "terminal", "cpu", "globe", 
+        "server", "file-text", "users", "video", "calendar", 
+        "clock", "award", "briefcase", "camera", "settings", 
+        "command", "compass", "edit", "eye", "gift"
+    ];
+
+    private string GetDateClass(DateTime date)
+    {
+        var status = GetDayStatus(date);
+        return status switch {
+            HolidayHelper.DayStatus.Overlap => "date-overlap",
+            _ => ""
+        };
+    }
+
+    private DateTime? startDate
+    {
+        get => Module?.StartDate;
+        set { if (Module != null) Module.StartDate = value ?? DateTime.Today; }
+    }
+
+    private DateTime? endDate
+    {
+        get => Module?.EndDate;
+        set { if (Module != null) Module.EndDate = value ?? DateTime.Today; }
+    }
+
+    private HolidayHelper.DayStatus GetDayStatus(DateTime date)
+        => HolidayHelper.GetDayStatus(date, CourseStartDate, ExistingModules?.Where(m => m.Id != Module?.Id).Select(m => (m.StartDate, m.EndDate)) ?? Enumerable.Empty<(DateTime, DateTime)>());
+
+    private bool IsDateDisabled(DateTime date)
+        => HolidayHelper.IsDisabledDate(date, CourseStartDate, ExistingModules?.Where(m => m.Id != Module?.Id).Select(m => (m.StartDate, m.EndDate)) ?? Enumerable.Empty<(DateTime, DateTime)>());
 
     // Triggered when clicking the primary button in the dialog
     private async Task HandleSave()
     {
         validationError = null;
 
-        // Perform client-side validation before invoking the save callback
-        if (CourseStartDate.HasValue && Module.StartDate < CourseStartDate.Value)
+        // 1. Course Start Boundary
+        if (CourseStartDate.HasValue && Module.StartDate.Date < CourseStartDate.Value.Date)
         {
-            validationError = "Module start date cannot be earlier than course start date.";
+            validationError = $"Module cannot start before course start ({CourseStartDate.Value:yyyy-MM-dd}).";
             return;
         }
 
+        // 2. Logic Sequence
         if (Module.EndDate <= Module.StartDate)
         {
             validationError = "End date must be greater than start date.";
             return;
         }
 
+        // 3. Weekend check for Start/End points
+        if (Module.StartDate.DayOfWeek == DayOfWeek.Saturday || Module.StartDate.DayOfWeek == DayOfWeek.Sunday)
+        {
+            validationError = "Module cannot start on a weekend.";
+            return;
+        }
+
+        if (Module.EndDate.DayOfWeek == DayOfWeek.Saturday || Module.EndDate.DayOfWeek == DayOfWeek.Sunday)
+        {
+            validationError = "Module cannot end on a weekend.";
+            return;
+        }
+
+        // 4. Overlap Check (only within same course)
+        var otherModules = ExistingModules.Where(m => m.Id != Module.Id).ToList();
+        foreach (var other in otherModules)
+        {
+            // Overlap logic: (StartA <= EndB) and (EndA >= StartB)
+            if (Module.StartDate.Date <= other.EndDate.Date && Module.EndDate.Date >= other.StartDate.Date)
+            {
+                validationError = $"Module dates overlap with '{other.Name}' ({other.StartDate:MM-dd} to {other.EndDate:MM-dd}).";
+                return;
+            }
+        }
+
         await OnSave.InvokeAsync();
     }
-
-    // A curated list of Lucide icons suitable for educational content
-    private string[] availableIcons = [
-        "book-open", "graduation-cap", "school", "library", "pencil", 
-        "book", "clipboard-check", "calculator", "microscope", "flask-round", 
-        "test-tube", "music-2", "palette", "languages", "brain", 
-        "lightbulb", "presentation", "ruler", "shapes", "trophy", 
-        "medal", "landmark", "microchip", "binary", "rocket", 
-        "database", "layers", "shield", "flask-conical", "plug", 
-        "code", "layout", "terminal", "cpu", "globe", 
-        "server", "file-text", "users", "video", "calendar", 
-        "clock", "award", "briefcase", "camera", "cog", 
-        "command", "compass", "edit", "eye", "gift", 
-        "hard-drive", "hash", "image", "inbox", "link", 
-        "mail", "map", "music", "phone", "play", 
-        "search", "settings", "smartphone", "star", "tag", 
-        "thumbs-up", "trash", "user", "zap"
-    ];
 }

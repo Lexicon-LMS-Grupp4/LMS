@@ -208,11 +208,10 @@
                                         <span class="badge bg-secondary">@module.ActivityCount</span>
                                     </td>
                                     <td class="text-end text-nowrap">
-                                        <button class="btn btn-sm btn-outline-primary me-1"
-                                                title="View Details"
-                                                @onclick="() => HandleDetailsClicked(module)">
+                                        <a href="/admin/modules/@module.Id/details" class="btn btn-sm btn-outline-primary me-1"
+                                                title="View Details">
                                             <i class="bi bi-eye"></i>
-                                        </button>
+                                        </a>
                                         <button class="btn btn-sm btn-outline-secondary me-1"
                                                 title="Edit"
                                                 @onclick="() => HandleEditClicked(module)">

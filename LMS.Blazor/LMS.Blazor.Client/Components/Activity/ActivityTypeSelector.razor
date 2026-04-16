@@ -1,0 +1,55 @@
+﻿@using LMS.Shared.DTOs.ActivityType
+@using BlazorBlueprint.Components
+
+<div class="row g-2">
+    <div class="col-md-8">
+        <label class="form-label">Activity Type</label>
+        <InputSelect class="form-select" @bind-Value="SelectedActivityTypeId">
+            <option value="0">Select activity type</option>
+            @foreach (var type in ActivityTypes)
+            {
+                <option value="@type.Id">@type.Name</option>
+            }
+        </InputSelect>
+    </div>
+
+    <div class="col-md-2 d-flex align-items-end">
+        <BbButton Type="ButtonType.Button"
+                  Class="w-100"
+                  OnClick="HandleAddClick">
+            <i class="bi bi-plus-lg"></i>
+        </BbButton>
+    </div>
+
+    <div class="col-md-2 d-flex align-items-end">
+        <BbButton Type="ButtonType.Button"
+                  Variant="ButtonVariant.Destructive"
+                  Class="w-100"
+                  Disabled="@(SelectedActivityTypeId <= 0)"
+                  OnClick="HandleDeleteClick">
+            <i class="bi bi-dash-lg"></i>
+        </BbButton>
+    </div>
+</div>
+
+@code {
+    [Parameter] public int SelectedActivityTypeId { get; set; }
+    [Parameter] public EventCallback<int> SelectedActivityTypeIdChanged { get; set; }
+
+    [Parameter] public List<ActivityTypeDto> ActivityTypes { get; set; } = [];
+    [Parameter] public EventCallback OnAddClicked { get; set; }
+    [Parameter] public EventCallback<int> OnDeleteClicked { get; set; }
+
+    private async Task HandleAddClick()
+    {
+        await OnAddClicked.InvokeAsync();
+    }
+
+    private async Task HandleDeleteClick()
+    {
+        if (SelectedActivityTypeId > 0)
+        {
+            await OnDeleteClicked.InvokeAsync(SelectedActivityTypeId);
+        }
+    }
+}

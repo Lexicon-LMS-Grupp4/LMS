@@ -1,5 +1,6 @@
-﻿using LMS.Shared.DTOs.Module;
+using LMS.Shared.DTOs.Module;
 using LMS.Shared.DTOs.User;
+using LMS.Shared.DTOs.Document;
 
 namespace LMS.Shared.DTOs.Course;
 
@@ -20,4 +21,10 @@ public record CourseDetailDto : CourseDto
     /// Populated from APPLICATIONUSER table where CourseId matches this course.
     /// </summary>
     public List<ModuleDto> Modules { get; init; } = new();
+    
+    /// <summary>
+    /// List of documents associated with this course.
+    /// Populated from the DOCUMENT table where CourseId matches this course.
+    /// </summary>
+    public List<DocumentDto> Documents { get; init; } = new();
 }

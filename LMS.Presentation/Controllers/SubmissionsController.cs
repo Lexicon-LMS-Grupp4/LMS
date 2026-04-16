@@ -1,38 +1,35 @@
 ﻿using LMS.Shared.DTOs.Submission;
+using LMS.Shared.Request;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using Service.Contracts;
 using Swashbuckle.AspNetCore.Annotations;
-using System.Security.Claims;
 
 namespace LMS.Presentation.Controllers;
 
 [Route("api/submissions")]
 [ApiController]
 [Authorize]
-public class SubmissionsController : ControllerBase
+public class SubmissionsController : LmsControllerBase
 {
-    private readonly IServiceManager serviceManager;
-
-    public SubmissionsController(IServiceManager serviceManager)
+    private readonly ILogger<SubmissionsController> _logger;
+    public SubmissionsController(IServiceManager serviceManager, ILogger<SubmissionsController> logger) : base(serviceManager)
     {
-        this.serviceManager = serviceManager;
+        this._logger = logger;
     }
 
     [HttpGet]
     [SwaggerOperation(
         Summary = "Get all submissions",
-        Description = "Retrieves a paginated list of submissions, optionally filtered by activity or student"
+        Description = "Retrieves a paginated list of submissions that the user has access to, optionally filtered by activity or student"
     )]
     [SwaggerResponse(StatusCodes.Status200OK, "Submissions retrieved successfully")]
     public async Task<IActionResult> GetAllSubmissions(
-        [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 10,
-        [FromQuery] int? activityId = null,
-        [FromQuery] string? studentId = null)
+        [FromQuery] SubmissionsRequestParams query)
     {
-        var result = await serviceManager.SubmissionService.GetAllSubmissionsAsync(page, pageSize, activityId, studentId);
+        var result = await serviceManager.SubmissionService.GetAllSubmissionsAsync(UserId, query);
         return Ok(result);
     }
 
@@ -43,9 +40,10 @@ public class SubmissionsController : ControllerBase
     )]
     [SwaggerResponse(StatusCodes.Status200OK, "Submission retrieved successfully")]
     [SwaggerResponse(StatusCodes.Status404NotFound, "Submission not found")]
+    [SwaggerResponse(StatusCodes.Status403Forbidden, "Forbidden")]
     public async Task<IActionResult> GetSubmissionById(int id)
     {
-        var submission = await serviceManager.SubmissionService.GetSubmissionByIdAsync(id);
+        var submission = await serviceManager.SubmissionService.GetSubmissionByIdAsync(id, UserId);
         return Ok(submission);
     }
 
@@ -56,9 +54,10 @@ public class SubmissionsController : ControllerBase
     )]
     [SwaggerResponse(StatusCodes.Status200OK, "Submission retrieved successfully")]
     [SwaggerResponse(StatusCodes.Status404NotFound, "Submission not found")]
+    [SwaggerResponse(StatusCodes.Status403Forbidden, "Forbidden")]
     public async Task<IActionResult> GetSubmissionDetailsById(int id)
     {
-        var submission = await serviceManager.SubmissionService.GetSubmissionDetailByIdAsync(id);
+        var submission = await serviceManager.SubmissionService.GetSubmissionDetailByIdAsync(id, UserId);
         return Ok(submission);
     }
 
@@ -69,12 +68,12 @@ public class SubmissionsController : ControllerBase
     )]
     [SwaggerResponse(StatusCodes.Status201Created, "Submission created successfully")]
     [SwaggerResponse(StatusCodes.Status400BadRequest, "Invalid input")]
-    public async Task<IActionResult> CreateSubmission([FromBody] CreateSubmissionDto dto)
-    {
-        var userId = User.FindFirst(ClaimTypes.NameIdentifier)!.Value;
+    [SwaggerResponse(StatusCodes.Status403Forbidden, "Forbidden")]
 
-        var submission = await serviceManager.SubmissionService.CreateSubmissionAsync(userId, dto);
-        return CreatedAtAction(nameof(GetSubmissionById), new { id = submission.Id }, submission);
+    public async Task<IActionResult> CreateSubmission([FromForm] CreateSubmissionDto dto)
+    {
+        var result = await serviceManager.SubmissionService.CreateSubmissionAsync(UserId, dto);
+        return Ok(result);
     }
 
     [HttpPut("{id}")]
@@ -84,9 +83,10 @@ public class SubmissionsController : ControllerBase
     )]
     [SwaggerResponse(StatusCodes.Status200OK, "Submission updated successfully")]
     [SwaggerResponse(StatusCodes.Status404NotFound, "Submission not found")]
-    public async Task<IActionResult> UpdateSubmission(int id, [FromBody] UpdateSubmissionDto dto)
+    [SwaggerResponse(StatusCodes.Status403Forbidden, "Forbidden")]
+    public async Task<IActionResult> UpdateSubmission(int id, [FromForm] UpdateSubmissionDto dto)
     {
-        await serviceManager.SubmissionService.UpdateSubmissionAsync(id, dto);
+        await serviceManager.SubmissionService.UpdateSubmissionAsync(id, UserId, dto);
         return NoContent();
     }
 
@@ -97,9 +97,10 @@ public class SubmissionsController : ControllerBase
     )]
     [SwaggerResponse(StatusCodes.Status200OK, "Submission updated successfully")]
     [SwaggerResponse(StatusCodes.Status404NotFound, "Submission not found")]
-    public async Task<IActionResult> PatchSubmission(int id, [FromBody] PatchSubmissionDto dto)
+    [SwaggerResponse(StatusCodes.Status403Forbidden, "Forbidden")]
+    public async Task<IActionResult> PatchSubmission(int id, [FromForm] PatchSubmissionDto dto)
     {
-        await serviceManager.SubmissionService.UpdateSubmissionPartiallyAsync(id, dto);
+        await serviceManager.SubmissionService.UpdateSubmissionPartiallyAsync(id, UserId, dto);
         return NoContent();
     }
 
@@ -110,10 +111,10 @@ public class SubmissionsController : ControllerBase
     )]
     [SwaggerResponse(StatusCodes.Status200OK, "Feedback submitted successfully")]
     [SwaggerResponse(StatusCodes.Status404NotFound, "Submission not found")]
+    [SwaggerResponse(StatusCodes.Status403Forbidden, "Forbidden")]
     public async Task<IActionResult> SubmitComment(int id, [FromBody] SubmitCommentDto dto)
     {
-        var userId = User.FindFirst(ClaimTypes.NameIdentifier)!.Value;
-        await serviceManager.SubmissionService.SubmitCommentAsync(id, userId, dto);
+        await serviceManager.SubmissionService.SubmitCommentAsync(id, UserId, dto);
         return Ok(new { message = "Feedback submitted successfully" });
     }
 
@@ -124,9 +125,10 @@ public class SubmissionsController : ControllerBase
     )]
     [SwaggerResponse(StatusCodes.Status200OK, "Submission deleted successfully")]
     [SwaggerResponse(StatusCodes.Status404NotFound, "Submission not found")]
+    [SwaggerResponse(StatusCodes.Status403Forbidden, "Forbidden")]
     public async Task<IActionResult> DeleteSubmission(int id)
     {
-        await serviceManager.SubmissionService.DeleteSubmissionAsync(id);
+        await serviceManager.SubmissionService.DeleteSubmissionAsync(id, UserId);
         return Ok(new { message = "Submission deleted successfully" });
     }
 }

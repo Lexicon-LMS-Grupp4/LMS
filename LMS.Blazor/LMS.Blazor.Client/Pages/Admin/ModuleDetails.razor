@@ -1,12 +1,20 @@
-﻿@page "/admin/modules/{ModuleId:int}/details"
-@attribute [Authorize(Roles = "Teacher")]
+@page "/admin/modules/{ModuleId:int}/details"
+@page "/modules/{ModuleId:int}/details"
+@attribute [Authorize(Roles = "Teacher,Student")]
+@using LMS.Blazor.Client.Components
+@using LMS.Blazor.Client.Components.Activity
+@using LMS.Blazor.Client.Uploads
 @using LMS.Shared.DTOs.Activity
+@using LMS.Shared.DTOs.ActivityType
 @using LMS.Shared.DTOs.Document
 @using LMS.Shared.DTOs.Module
-@using Domain.Models.Enums
+@inject IActivityTypeService ActivityTypeService
 @inject IModuleService ModuleService
 @inject IActivityService ActivityService
+@inject IDocumentService DocumentService
 @inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthStateProvider
+@inject IDocumentService DocumentService
 
 <PageTitle>Module Details</PageTitle>
 
@@ -98,86 +106,30 @@
         <div class="card mb-4">
             <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
                 <h6 class="mb-0"><i class="bi bi-lightning me-2"></i>Activities</h6>
-                <button class="btn btn-sm btn-primary" @onclick="() => showAddActivity = !showAddActivity">
-                    <i class="bi bi-plus-lg"></i>
-                    <span class="d-none d-md-inline ms-1">Add Activity</span>
-                </button>
+                @if (isTeacher)
+                {
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-sm btn-primary" @onclick="OpenCreateActivityDialog">
+                            <i class="bi bi-plus-lg"></i>
+                            <span class="d-none d-md-inline ms-1">Add Activity</span>
+                        </button>
+                        <button class="btn btn-sm btn-outline-secondary" @onclick="OpenActivityTypeDialog">
+                            <i class="bi bi-tag"></i>
+                            <span class="d-none d-md-inline ms-1">Add Type</span>
+                        </button>
+                    </div>
+                }
             </div>
 
-            @* ---- Add Activity Panel ---- *@
-            @if (showAddActivity)
-            {
-                <div class="card-body border-bottom bg-light">
-                    <div class="row g-2 align-items-end">
-                        <div class="col-12 col-sm-6 col-xl-3">
-                            <label class="form-label small fw-semibold mb-1">Name <span class="text-danger">*</span></label>
-                            <input class="form-control form-control-sm @(activityErrors.ContainsKey("Name") ? "is-invalid" : "")"
-                                   @bind="newActivity.Name"
-                                   placeholder="e.g. Lecture 1" />
-                            @if (activityErrors.TryGetValue("Name", out var nameErr))
-                            {
-                                <div class="invalid-feedback">@nameErr</div>
-                            }
-                        </div>
-
-                        <div class="col-12 col-sm-6 col-xl-2">
-                            <label class="form-label small fw-semibold mb-1">Description</label>
-                            <input class="form-control form-control-sm"
-                                   @bind="newActivity.Description"
-                                   placeholder="Optional" />
-                        </div>
-
-                        <div class="col-12 col-sm-4 col-xl-2">
-                            <label class="form-label small fw-semibold mb-1">Type <span class="text-danger">*</span></label>
-                            <select class="form-select form-select-sm" @bind="newActivity.Type">
-                                @foreach (var type in Enum.GetValues<ActivityType>())
-                                {
-                                    <option value="@type">@type</option>
-                                }
-                            </select>
-                        </div>
-
-                        <div class="col-12 col-sm-4 col-xl-2">
-                            <label class="form-label small fw-semibold mb-1">Start <span class="text-danger">*</span></label>
-                            <input type="datetime-local"
-                                   class="form-control form-control-sm @(activityErrors.ContainsKey("StartTime") ? "is-invalid" : "")"
-                                   @bind="newActivity.StartTime" />
-                            @if (activityErrors.TryGetValue("StartTime", out var startErr))
-                            {
-                                <div class="invalid-feedback">@startErr</div>
-                            }
-                        </div>
-
-                        <div class="col-12 col-sm-4 col-xl-2">
-                            <label class="form-label small fw-semibold mb-1">End <span class="text-danger">*</span></label>
-                            <input type="datetime-local"
-                                   class="form-control form-control-sm @(activityErrors.ContainsKey("EndTime") ? "is-invalid" : "")"
-                                   @bind="newActivity.EndTime" />
-                            @if (activityErrors.TryGetValue("EndTime", out var endErr))
-                            {
-                                <div class="invalid-feedback">@endErr</div>
-                            }
-                        </div>
-
-                        <div class="col-12 col-xl-1 d-flex gap-1">
-                            <button class="btn btn-sm btn-success flex-fill"
-                                    @onclick="AddActivityAsync"
-                                    disabled="@isAddingActivity">
-                                @if (isAddingActivity)
-                                {
-                                    <span class="spinner-border spinner-border-sm"></span>
-                                }
-                                else
-                                {
-                                    <span>Save</span>
-                                }
-                            </button>
-                            <button class="btn btn-sm btn-secondary"
-                                    @onclick="() => { showAddActivity = false; activityErrors = new(); }">✕</button>
-                        </div>
-                    </div>
-                </div>
-            }
+            @* ActivityTypeDialog is used both from the header button
+               and from the Add/Edit Type button inside ActivityDialog *@
+            <ActivityTypeDialog @bind-Open="activityTypeDialogOpen"
+                                @bind-Name="newActivityTypeName"
+                                @bind-Description="newActivityTypeDescription"
+                                Error="@activityTypeError"
+                                IsSaving="isCreatingActivityType"
+                                OnSave="HandleCreateActivityType"
+                                OnCancel="() => activityTypeError = null"/>
 
             @* ---- Activity table ---- *@
             <div class="card-body p-0">
@@ -197,7 +149,7 @@
                                     <th class="d-none d-sm-table-cell">End</th>
                                     <th class="text-center d-none d-md-table-cell">Docs</th>
                                     <th class="text-center d-none d-md-table-cell">Submissions</th>
-                                    <th style="width:100px;"></th>
+                                    <th style="width:120px;"></th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -212,14 +164,10 @@
                                             }
                                         </td>
                                         <td>
-                                            <span class="badge @GetActivityTypeBadge(act.Type)">@act.Type</span>
+                                            <span class="badge @ActivityHelpers.GetActivityTypeBadge(act.ActivityTypeName)">@act.ActivityTypeName</span>
                                         </td>
-                                        <td class="d-none d-sm-table-cell text-muted small">
-                                            @act.StartTime.ToString("yyyy-MM-dd HH:mm")
-                                        </td>
-                                        <td class="d-none d-sm-table-cell text-muted small">
-                                            @act.EndTime.ToString("yyyy-MM-dd HH:mm")
-                                        </td>
+                                        <td class="d-none d-sm-table-cell text-muted small">@act.StartTime?.ToString("yyyy-MM-dd HH:mm")</td>
+                                        <td class="d-none d-sm-table-cell text-muted small">@act.EndTime.ToString("yyyy-MM-dd HH:mm")</td>
                                         <td class="text-center d-none d-md-table-cell">
                                             <span class="badge bg-info text-dark">@act.DocumentCount</span>
                                         </td>
@@ -229,14 +177,22 @@
                                         <td class="text-end text-nowrap">
                                             <button class="btn btn-sm btn-outline-primary me-1"
                                                     title="View Details"
-                                                    @onclick="() => Navigation.NavigateTo(GetDetailsUrl(act.Id))">
+                                                    @onclick="() => Navigation.NavigateTo(getURL(act.Id))">
                                                 <i class="bi bi-eye"></i>
                                             </button>
-                                            <button class="btn btn-sm btn-outline-danger"
-                                                    title="Delete"
-                                                    @onclick="() => HandleDeleteActivity(act)">
-                                                <i class="bi bi-trash"></i>
-                                            </button>
+                                            @if (isTeacher)
+                                            {
+                                                <button class="btn btn-sm btn-outline-secondary me-1"
+                                                        title="Edit"
+                                                        @onclick="() => OpenEditActivityDialog(act)">
+                                                    <i class="bi bi-pencil"></i>
+                                                </button>
+                                                <button class="btn btn-sm btn-outline-danger"
+                                                        title="Delete"
+                                                        @onclick="() => HandleDeleteActivity(act)">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            }
                                         </td>
                                     </tr>
                                 }
@@ -253,22 +209,24 @@
         <div class="card mb-4">
             <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
                 <h6 class="mb-0"><i class="bi bi-file-earmark me-2"></i>Documents</h6>
-                <button class="btn btn-sm btn-primary"
-                        title="Upload Document"
-                        @onclick="() => showUploadDocument = !showUploadDocument">
-                    <i class="bi bi-upload"></i>
-                    <span class="d-none d-md-inline ms-1">Upload Document</span>
-                </button>
+                @if (isTeacher)
+                {
+                    <button class="btn btn-sm btn-primary"
+                            title="Upload Document"
+                            @onclick="() => showUploadDocument = !showUploadDocument">
+                        <i class="bi bi-upload"></i>
+                        <span class="d-none d-md-inline ms-1">Upload Document</span>
+                    </button>
+                }
             </div>
 
             @if (showUploadDocument)
             {
                 <div class="card-body border-bottom bg-light">
-                    <div class="alert alert-info mb-0 py-2">
-                        <i class="bi bi-info-circle me-2"></i>
-                        Document upload requires an authenticated user context
-                        (<code>UploadedByUserId</code>) — not yet wired up on this page.
-                    </div>
+                    <UploadDocumentField 
+                        Label="Select Document"
+                        @bind-Value="documentUpload"
+                        HandleSubmit="SaveDocumentAsync" />
                 </div>
             }
 
@@ -283,40 +241,30 @@
                         <table class="table table-hover mb-0">
                             <thead class="table-light">
                                 <tr>
-                                    <th>Name</th>
-                                    <th class="d-none d-md-table-cell">File</th>
-                                    <th class="d-none d-sm-table-cell">Uploaded</th>
-                                    <th class="d-none d-sm-table-cell">By</th>
-                                    <th style="width:60px;"></th>
+                                    <th style="width:100%"></th> @* force minimize second column *@
+                                    @if (isTeacher)
+                                    {
+                                        <th></th>
+                                    }
                                 </tr>
                             </thead>
                             <tbody>
                                 @foreach (var doc in documents)
                                 {
                                     <tr>
-                                        <td>
-                                            <div class="fw-semibold">@doc.DisplayName</div>
-                                            @if (!string.IsNullOrEmpty(doc.Description))
-                                            {
-                                                <div class="text-muted small text-truncate" style="max-width:200px;">@doc.Description</div>
-                                            }
+                                        <td class="align-middle">
+                                            <DocumentWithDownload Document="doc" />
                                         </td>
-                                        <td class="d-none d-md-table-cell text-muted small">
-                                            <i class="bi bi-file-earmark me-1"></i>@doc.DisplayName
-                                        </td>
-                                        <td class="d-none d-sm-table-cell text-muted small">
-                                            @doc.UploadedAt.ToString("yyyy-MM-dd")
-                                        </td>
-                                        <td class="d-none d-sm-table-cell text-muted small">
-                                            @doc.UploadedByUserName
-                                        </td>
-                                        <td class="text-end">
-                                            <button class="btn btn-sm btn-outline-danger"
-                                                    title="Remove Document"
-                                                    @onclick="() => HandleDeleteDocument(doc)">
-                                                <i class="bi bi-trash"></i>
-                                            </button>
-                                        </td>
+                                        @if (isTeacher)
+                                        {
+                                            <td class="align-middle">
+                                                <button class="btn btn-sm btn-outline-danger"
+                                                        title="Delete"
+                                                        @onclick="() => HandleDeleteDocument(doc)">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </td>
+                                        }
                                     </tr>
                                 }
                             </tbody>
@@ -327,6 +275,17 @@
         </div>
     }
 </div>
+
+@* ---- Add / Edit Activity dialog ---- *@
+<ActivityDialog @bind-Open="dialogOpen"
+                IsEditing="isEditing"
+                HideModuleSelection="true"
+                Model="formModel"
+                ActivityTypes="activityTypes"
+                OnSave="HandleActivitySave"
+                OnAddActivityType="OpenActivityTypeDialog"
+                OnDeleteActivityType="HandleDeleteActivityType"
+                ActivityTypeError="@activityTypeError" />
 
 @* ---- Delete Activity modal ---- *@
 @if (showDeleteActivityConfirm && activityToDelete is not null)
@@ -342,7 +301,7 @@
                     All associated submissions will also be removed. This cannot be undone.
                 </div>
                 <div class="modal-footer">
-                    <button class="btn btn-secondary" @onclick="CancelDeleteActivity">Cancel</button>
+                    <button class="btn btn-secondary" @onclick="() => { showDeleteActivityConfirm = false; activityToDelete = null; }">Cancel</button>
                     <button class="btn btn-danger" @onclick="ConfirmDeleteActivityAsync" disabled="@isDeletingActivity">
                         @if (isDeletingActivity)
                         {
@@ -384,6 +343,8 @@
     private ModuleDetailDto? module;
     private List<ActivityDto> activities = [];
     private List<DocumentDto> documents = [];
+    private List<ActivityTypeDto> activityTypes = [];
+    private bool isTeacher;
 
     // ---- Page state ----
     private bool isLoading;
@@ -391,34 +352,50 @@
     private string? successMessage;
     private string? errorMessage;
 
-    // ---- Add activity ----
-    private bool showAddActivity;
-    private bool isAddingActivity;
-    private ActivityFormModel newActivity = new();
-    private Dictionary<string, string> activityErrors = new();
+    // ---- Activity dialog (shared for create & edit) ----
+    private bool dialogOpen;
+    private bool isEditing;
+    private ActivityDto? editingActivity;
+    private ActivityDialog.ActivityFormModel formModel = new();
 
     // ---- Delete activity ----
     private bool showDeleteActivityConfirm;
     private bool isDeletingActivity;
     private ActivityDto? activityToDelete;
 
+    // ---- Activity Type dialog ----
+    private bool activityTypeDialogOpen;
+    private string newActivityTypeName = string.Empty;
+    private string newActivityTypeDescription = string.Empty;
+    private string? activityTypeError;
+    private bool isCreatingActivityType;
+
     // ---- Documents ----
     private bool showUploadDocument;
     private bool showDeleteDocumentConfirm;
     private DocumentDto? documentToDelete;
+    private UploadDocumentValue documentUpload = new();
 
     // ---- Lifecycle ----
     protected override async Task OnInitializedAsync()
-        => await LoadModuleAsync();
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        isTeacher = authState.User.IsInRole("Teacher");
+        await LoadModuleAsync();
+    }
 
     private async Task LoadModuleAsync()
     {
         isLoading = true;
         loadError = null;
+        documentUpload = new UploadDocumentValue();
         StateHasChanged();
 
         try
         {
+            var typesResult = await ActivityTypeService.GetAllActivityTypesAsync();
+            activityTypes = typesResult?.ToList() ?? [];
+
             module = await ModuleService.GetModuleDetailByIdAsync(ModuleId);
             if (module is not null)
             {
@@ -436,59 +413,94 @@
         }
     }
 
-    // ---- Activity actions ----
-    private async Task AddActivityAsync()
-    {
-        activityErrors = ValidateActivityForm();
-        if (activityErrors.Any()) return;
+    // ---- Activity dialog actions ----
 
-        isAddingActivity = true;
+    private void OpenCreateActivityDialog()
+    {
+        activityTypeError = null;
+        isEditing = false;
+        editingActivity = null;
+        formModel = new()
+        {
+            ModuleId = ModuleId,
+            ActivityTypeId = activityTypes.FirstOrDefault()?.Id ?? 0
+        };
+        dialogOpen = true;
+    }
+
+    private void OpenEditActivityDialog(ActivityDto act)
+    {
+        activityTypeError = null;
+        isEditing = true;
+        editingActivity = act;
+        formModel = new()
+        {
+            ModuleId = act.ModuleId,
+            Name = act.Name,
+            Description = act.Description,
+            ActivityTypeId = act.ActivityTypeId,
+            StartTime = act.StartTime,
+            EndTime = act.EndTime
+        };
+        dialogOpen = true;
+    }
+
+    private async Task HandleActivitySave()
+    {
         try
         {
-            var dto = new CreateActivityDto
+            if (!isEditing)
             {
-                ModuleId = ModuleId,
-                Name = newActivity.Name,
-                Description = newActivity.Description,
-                Type = newActivity.Type,
-                StartTime = newActivity.StartTime,
-                EndTime = newActivity.EndTime
-            };
+                var created = await ActivityService.CreateActivityAsync(new CreateActivityDto
+                {
+                    ModuleId = ModuleId,
+                    Name = formModel.Name,
+                    Description = formModel.Description,
+                    ActivityTypeId = formModel.ActivityTypeId,
+                    StartTime = formModel.StartTime ?? DateTime.Now,
+                    EndTime = formModel.EndTime
+                });
 
-            var created = await ActivityService.CreateActivityAsync(dto);
-            if (created is not null)
-            {
-                activities.Add(created);
-                successMessage = $"Activity '{created.Name}' created.";
-                newActivity = new();
-                showAddActivity = false;
-                activityErrors = new();
+                if (created is not null)
+                {
+                    activities.Add(created);
+                    successMessage = $"Activity '{created.Name}' created.";
+                    dialogOpen = false;
+                }
+                else
+                {
+                    errorMessage = "Failed to create activity. Please try again.";
+                }
             }
-            else
+            else if (editingActivity is not null)
             {
-                errorMessage = "Failed to create activity. Please try again.";
+                await ActivityService.UpdateActivityAsync(editingActivity.Id, new UpdateActivityDto
+                {
+                    Name = formModel.Name,
+                    Description = formModel.Description,
+                    ActivityTypeId = formModel.ActivityTypeId,
+                    StartTime = formModel.StartTime ?? DateTime.Now,
+                    EndTime = formModel.EndTime
+                });
+
+                dialogOpen = false;
+                successMessage = $"Activity '{formModel.Name}' updated.";
+                // Reload to get fresh data with updated type name etc.
+                await LoadModuleAsync();
             }
         }
         catch (Exception ex)
         {
-            errorMessage = $"Error: {ex.Message}";
-        }
-        finally
-        {
-            isAddingActivity = false;
+            errorMessage = $"Failed to save activity. {ex.Message}";
         }
     }
+
+    // ---- Activity delete ----
 
     private void HandleDeleteActivity(ActivityDto act)
     {
         activityToDelete = act;
         showDeleteActivityConfirm = true;
-    }
-
-    private void CancelDeleteActivity()
-    {
-        activityToDelete = null;
-        showDeleteActivityConfirm = false;
     }
 
     private async Task ConfirmDeleteActivityAsync()
@@ -515,7 +527,105 @@
         }
     }
 
+    // ---- Activity Type dialog ----
+
+    private void OpenActivityTypeDialog()
+    {
+        newActivityTypeName = string.Empty;
+        newActivityTypeDescription = string.Empty;
+        activityTypeError = null;
+        activityTypeDialogOpen = true;
+        // Note: we intentionally do NOT close dialogOpen here so that
+        // ActivityTypeDialog stacks on top of ActivityDialog when triggered from within it.
+    }
+
+    private async Task HandleCreateActivityType()
+    {
+        activityTypeError = null;
+
+        if (string.IsNullOrWhiteSpace(newActivityTypeName))
+        {
+            activityTypeError = "Please enter an activity type name.";
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(newActivityTypeDescription))
+        {
+            activityTypeError = "Please enter an activity type description.";
+            return;
+        }
+
+        isCreatingActivityType = true;
+        try
+        {
+            var created = await ActivityTypeService.CreateActivityTypeAsync(new CreateActivityTypeDto
+            {
+                Name = newActivityTypeName.Trim(),
+                Description = newActivityTypeDescription
+            });
+
+            if (created is null)
+            {
+                activityTypeError = "Failed to create activity type.";
+                return;
+            }
+
+            var typesResult = await ActivityTypeService.GetAllActivityTypesAsync();
+            activityTypes = typesResult?.ToList() ?? [];
+
+            // Pre-select the newly created type in the dialog form
+            formModel.ActivityTypeId = created.Id;
+
+            activityTypeDialogOpen = false;
+            newActivityTypeName = string.Empty;
+            newActivityTypeDescription = string.Empty;
+        }
+        catch (Exception ex)
+        {
+            activityTypeError = $"Failed to create activity type. {ex.Message}";
+        }
+        finally
+        {
+            isCreatingActivityType = false;
+        }
+    }
+
+    private async Task HandleDeleteActivityType(int activityTypeId)
+    {
+        try
+        {
+            await ActivityTypeService.DeleteActivityTypeAsync(activityTypeId);
+            var typesResult = await ActivityTypeService.GetAllActivityTypesAsync();
+            activityTypes = typesResult?.ToList() ?? [];
+            formModel.ActivityTypeId = 0;
+        }
+        catch (Exception ex)
+        {
+            activityTypeError = $"Cannot delete this activity type: {ex.Message}";
+        }
+    }
+
     // ---- Document actions ----
+    private async Task SaveDocumentAsync()
+    {
+        var createdDocument = await DocumentService.CreateDocumentAsync(new CreateDocumentDto
+        {
+            ModuleId = ModuleId,
+            Description = documentUpload.Description
+        }, documentUpload);
+
+        if(createdDocument is not null)
+        {
+            documents.Add(createdDocument);
+            successMessage = $"Document '{createdDocument.DisplayName}' uploaded.";
+            documentUpload = new UploadDocumentValue();
+            showUploadDocument = false;
+        }
+        else
+        {
+            errorMessage = "Failed to upload document. Please try again.";
+        }
+    }
+
     private void HandleDeleteDocument(DocumentDto doc)
     {
         documentToDelete = doc;
@@ -526,57 +636,31 @@
     {
         if (documentToDelete is null) return;
 
-        // TODO: wire IDocumentService to client and call DeleteDocumentAsync
+        await DocumentService.DeleteDocumentAsync(documentToDelete.Id);
         documents.RemoveAll(d => d.Id == documentToDelete.Id);
-        successMessage = $"Document '{documentToDelete.DisplayName}' removed.";
+        successMessage = $"Document '{documentToDelete.DisplayName}' was deleted.";
         documentToDelete = null;
         showDeleteDocumentConfirm = false;
         await Task.CompletedTask;
     }
 
-    // ---- Validation ----
-    private Dictionary<string, string> ValidateActivityForm()
-    {
-        var errors = new Dictionary<string, string>();
-
-        if (string.IsNullOrWhiteSpace(newActivity.Name))
-            errors["Name"] = "Name is required.";
-
-        if (newActivity.StartTime == default)
-            errors["StartTime"] = "Start time is required.";
-
-        if (newActivity.EndTime == default)
-            errors["EndTime"] = "End time is required.";
-        else if (newActivity.EndTime <= newActivity.StartTime)
-            errors["EndTime"] = "End time must be after start time.";
-
-        return errors;
-    }
-
     // ---- Helpers ----
-    private void GoBack() => Navigation.NavigateTo($"/admin/modules");
+    private void GoBack() => Navigation.NavigateTo($"/courses/{module!.CourseId}");
 
-    private static string GetActivityTypeBadge(ActivityType type) => type switch
-    {
-        ActivityType.Assignment  => "bg-warning text-dark",
-        ActivityType.Exercise        => "bg-danger",
-        ActivityType.Lecture     => "bg-primary",
-        ActivityType.ELearning  => "bg-success",
-        _                        => "bg-secondary"
-    };
+    // private string getURL(int activityId) => $"/admin/activities/{activityId}/details";
+    private string getURL(int activityId) 
+        => isTeacher ? $"/admin/activities/{activityId}/details" 
+                     : $"/activities/{activityId}/details";
 
-    // ---- Local models ----
-    private class ActivityFormModel
+    public static class ActivityHelpers
     {
-        public string Name { get; set; } = string.Empty;
-        public string Description { get; set; } = string.Empty;
-        public ActivityType Type { get; set; } = ActivityType.Lecture;
-        public DateTime StartTime { get; set; } = DateTime.Today.AddHours(9);
-        public DateTime EndTime { get; set; } = DateTime.Today.AddHours(11);
-    }
-
-    private string GetDetailsUrl(int id)
-    {
-        return $"/admin/activities/{id}/details";
+        public static string GetActivityTypeBadge(string? typeName) => typeName switch
+        {
+            "Assignment" => "bg-warning text-dark",
+            "Exercise"   => "bg-danger",
+            "Lecture"    => "bg-primary",
+            "E-Learning" => "bg-success",
+            _            => "bg-secondary"
+        };
     }
 }

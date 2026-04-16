@@ -1,10 +1,14 @@
 ﻿@page "/student/activities/{ActivityId:int}/submit"
 @attribute [Authorize(Roles = "Student")]
+@using LMS.Blazor.Client.Components
+@using LMS.Blazor.Client.Uploads
 @using LMS.Shared.DTOs.Activity
 @using LMS.Shared.DTOs.Document
 @using LMS.Shared.DTOs.Submission
-@using Domain.Models.Enums
+@using LMS.Shared.DTOs.SubmissionComment
 @inject IActivityService ActivityService
+@inject IDocumentService DocumentService
+@inject ISubmissionService SubmissionService
 @inject NavigationManager Navigation
 
 <PageTitle>Submit Activity</PageTitle>
@@ -65,7 +69,7 @@
         <div class="card mb-4">
             <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
                 <div>
-                    <span class="badge @GetActivityTypeBadge(activity.Type) me-2">@activity.Type</span>
+                    <span class="badge @GetActivityTypeBadge(activity.ActivityTypeName) me-2">@activity.ActivityTypeName</span>
                     <span class="fw-semibold">@activity.ModuleName</span>
                 </div>
                 @if (isOverdue)
@@ -91,7 +95,7 @@
                 <div class="row g-2 small">
                     <div class="col-6 col-md-3">
                         <span class="text-muted d-block">Opens</span>
-                        <span>@activity.StartTime.ToString("MMM d, yyyy HH:mm")</span>
+                        <span>@(activity.StartTime?.ToString("MMM d, yyyy HH:mm") ?? "—")</span>
                     </div>
                     <div class="col-6 col-md-3">
                         <span class="text-muted d-block">Deadline</span>
@@ -152,12 +156,12 @@
         @* ==============================
            EXISTING SUBMISSION (if any)
            ============================== *@
-        @if (existingSubmission is not null)
+        @if (existingSubmission is not null && !showResubmitForm)
         {
             <div class="card mb-4 border-success">
                 <div class="card-header bg-success bg-opacity-10 d-flex flex-wrap justify-content-between align-items-center gap-2">
                     <h6 class="mb-0 text-success">
-                        <i class="bi bi-check-circle me-2"></i>Already Submitted
+                        <i class="bi bi-check-circle me-2"></i>Your submission
                     </h6>
                     <div class="d-flex gap-2 flex-wrap">
                         @if (existingSubmission.IsLate)
@@ -176,52 +180,64 @@
                 <div class="card-body">
                     @if (!string.IsNullOrEmpty(existingSubmission.Body))
                     {
-                        <p class="small fw-semibold text-muted mb-1">Your answer</p>
+                        <p class="small fw-semibold text-muted mb-1">Answer</p>
                         <div class="border rounded p-3 bg-light small" style="white-space:pre-wrap;">
                             @existingSubmission.Body
                         </div>
                     }
-                    else if (existingSubmission.Document is not null)
+                    @if (existingSubmission.Document is not null)
                     {
                         <p class="small fw-semibold text-muted mb-1">Attached file</p>
-                        <div class="d-flex align-items-center gap-2 border rounded p-2 bg-light">
-                            <i class="bi bi-file-earmark-text fs-4 text-muted"></i>
-                            <div>
-                                <div class="fw-semibold small">@existingSubmission.Document.DisplayName</div>
+                        <div class="border rounded p-3 bg-light">
+                            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                                <div>
+                                    <div class="fw-semibold">@existingSubmission.Document.DisplayName</div>
+                                    @if (!string.IsNullOrWhiteSpace(existingSubmission.Document.Description))
+                                    {
+                                        <div class="text-muted small">@existingSubmission.Document.Description</div>
+                                    }
+                                </div>
+                                <a class="btn btn-sm btn-primary"
+                                   href="@DocumentService.GetDocumentFileUrl(existingSubmission.Document.Id, true)"
+                                   target="_blank">
+                                    <i class="bi bi-download me-1"></i>Download file
+                                </a>
                             </div>
                         </div>
                     }
 
-                    @* ---- Feedback block ---- *@
-                    @* TODO: implement new submission comments *@
-                    @* @if (existingSubmission.FeedbackText is not null)
+                    <hr />
+                    <p class="small fw-semibold text-muted mb-2">
+                        <i class="bi bi-chat-left-text me-1"></i>Teacher Feedback
+                    </p>
+                    @if (TeacherComments.Any())
                     {
-                        <hr />
-                        <p class="small fw-semibold text-muted mb-1">
-                            <i class="bi bi-chat-left-text me-1"></i>Teacher Feedback
-                            <span class="text-muted fw-normal ms-2">
-                                (@existingSubmission.FeedbackGivenAt?.ToString("MMM d, yyyy"))
-                            </span>
-                        </p>
-                        <div class="border rounded p-3 bg-white small" style="white-space:pre-wrap;">
-                            @existingSubmission.FeedbackText
-                        </div>
+                        @foreach (var comment in TeacherComments)
+                        {
+                            <div class="border rounded p-3 bg-white small mb-2">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <span class="fw-semibold">@comment.AuthorName</span>
+                                    <span class="text-muted">@comment.CreatedAt.ToString("MMM d, yyyy HH:mm")</span>
+                                </div>
+                                <div style="white-space:pre-wrap;">@comment.Text</div>
+                            </div>
+                        }
                     }
                     else
                     {
                         <p class="text-muted small mt-3 mb-0">
                             <i class="bi bi-hourglass-split me-1"></i>Feedback not yet given.
                         </p>
-                    } *@
+                    }
 
                     @* ---- Re-submit option (only if deadline not passed) ---- *@
                     @if (!isOverdue)
                     {
                         <div class="mt-3">
                             <button class="btn btn-sm btn-outline-primary"
-                                    @onclick="() => showResubmitForm = !showResubmitForm">
+                                    @onclick="ToggleEditSubmission">
                                 <i class="bi bi-pencil me-1"></i>
-                                @(showResubmitForm ? "Cancel Edit" : "Edit Submission")
+                                @(showResubmitForm ? "Cancel" : "Resend Submission")
                             </button>
                         </div>
                     }
@@ -235,10 +251,10 @@
         @if (existingSubmission is null || showResubmitForm)
         {
             <div class="card mb-4 @(isOverdue ? "border-danger border-opacity-25" : "")">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h6 class="mb-0">
+                <div class="card-header d-flex bg-success bg-opacity-10 justify-content-between align-items-center">
+                    <h6 class="mb-0 text-success">
                         <i class="bi bi-send me-2"></i>
-                        @(existingSubmission is null ? "Your Submission" : "Edit Submission")
+                        @(existingSubmission is null ? "Your Submission" : "Resend Submission")
                     </h6>
                     @if (isOverdue)
                     {
@@ -246,105 +262,72 @@
                     }
                 </div>
                 <div class="card-body">
-
-                    @* ---- Tab switcher: text vs file ---- *@
-                    <ul class="nav nav-tabs mb-3">
-                        <li class="nav-item">
-                            <button class="nav-link @(submissionTab == SubmissionTab.Text ? "active" : "")"
-                                    @onclick="() => submissionTab = SubmissionTab.Text">
-                                <i class="bi bi-textarea-t me-1"></i>Text Answer
-                            </button>
-                        </li>
-                        <li class="nav-item">
-                            <button class="nav-link @(submissionTab == SubmissionTab.File ? "active" : "")"
-                                    @onclick="() => submissionTab = SubmissionTab.File">
-                                <i class="bi bi-file-earmark-arrow-up me-1"></i>File Upload
-                            </button>
-                        </li>
-                    </ul>
-
-                    @if (submissionTab == SubmissionTab.Text)
-                    {
-                        <div class="mb-3">
-                            <label class="form-label fw-semibold">
-                                Your Answer
-                                @if (!isOverdue)
-                                {
-                                    <span class="text-danger">*</span>
-                                }
-                            </label>
-                            <textarea class="form-control @(formErrors.ContainsKey("Body") ? "is-invalid" : "")"
-                                      rows="8"
-                                      placeholder="Write your answer here..."
-                                      @bind="submissionBody"
-                                          disabled="@isOverdue">
-                            </textarea>
-                                @if (formErrors.TryGetValue("Body", out var bodyErr))
-                                {
-                                    <div class="invalid-feedback">@bodyErr</div>
-                                }
-                                <div class="form-text">
-                                    @submissionBody.Length characters
-                                </div>
-                            </div>
-                        }
-                    else
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">
+                            Your Answer
+                            @if (!isOverdue)
+                            {
+                                <span class="text-danger">*</span>
+                            }
+                        </label>
+                        <textarea class="form-control @(formErrors.ContainsKey("Body") ? "is-invalid" : "")"
+                                    rows="8"
+                                    placeholder="Write your answer here..."
+                                    @bind="submissionBody">
+                        </textarea>
+                        @if (formErrors.TryGetValue("Body", out var bodyErr))
                         {
-                            <div class="mb-3">
-                                <label class="form-label fw-semibold">Attach File</label>
-                                <div class="border rounded p-4 text-center bg-light @(formErrors.ContainsKey("File") ? "border-danger" : "")">
-                                    <i class="bi bi-cloud-upload fs-2 text-muted d-block mb-2"></i>
-                                    <p class="text-muted small mb-2">
-                                        File upload requires document storage backend — not yet available.
-                                    </p>
-                                    <input type="file"
-                                           class="form-control form-control-sm"
-                                           disabled
-                                           @onchange="HandleFilePicked" />
-                                </div>
-                                @if (formErrors.TryGetValue("File", out var fileErr))
-                                {
-                                    <div class="text-danger small mt-1">@fileErr</div>
-                                }
-                            </div>
+                            <div class="invalid-feedback">@bodyErr</div>
                         }
-
-                        @* ---- Submit button ---- *@
-                        <div class="d-flex gap-2 flex-wrap align-items-center">
-                            <button class="btn @(isOverdue ? "btn-warning" : "btn-primary")"
-                                    @onclick="SubmitAsync"
-                                    disabled="@(isSubmitting || isOverdue)">
-                                @if (isSubmitting)
-                                {
-                                    <span class="spinner-border spinner-border-sm me-1"></span>
-                                }
-                                else
-                                {
-                                    <i class="bi bi-send me-1"></i>
-                                }
-                                @(existingSubmission is null ? "Submit" : "Update Submission")
-                            </button>
-
-                            @if (existingSubmission is not null)
-                            {
-                                <button class="btn btn-outline-secondary"
-                                        @onclick="() => showResubmitForm = false">
-                                    Cancel
-                                </button>
-                            }
-
-                            @if (isOverdue)
-                            {
-                                <span class="text-danger small">
-                                    <i class="bi bi-lock me-1"></i>Submission closed — deadline has passed.
-                                </span>
-                            }
+                        <div class="form-text">
+                            @submissionBody.Length characters
                         </div>
                     </div>
+                        
+                    <div class="mb-3">
+                        <UploadDocumentField
+                                @bind-Value="documentUpload"
+                                Label="Attach File"
+                                DescriptionPlaceholder="Optional description" />
+                    </div>
+                        
+
+                    @* ---- Submit button ---- *@
+                    <div class="d-flex gap-2 flex-wrap align-items-center">
+                        <button class="btn @(isOverdue ? "btn-warning" : "btn-primary")"
+                                @onclick="SubmitAsync"
+                                disabled="@(isSubmitting || isOverdue)">
+                            @if (isSubmitting)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1"></span>
+                            }
+                            else
+                            {
+                                <i class="bi bi-send me-1"></i>
+                            }
+                            @(existingSubmission is null ? "Submit" : "Resend Submission")
+                        </button>
+
+                        @if (existingSubmission is not null)
+                        {
+                            <button class="btn btn-outline-secondary"
+                                    @onclick="() => showResubmitForm = false">
+                                Cancel
+                            </button>
+                        }
+
+                        @if (isOverdue)
+                        {
+                            <span class="text-danger small">
+                                <i class="bi bi-lock me-1"></i>Submission closed — deadline has passed.
+                            </span>
+                        }
+                    </div>
                 </div>
-            }
+            </div>
         }
-    </div>
+    }
+</div>
 
 @code {
     [Parameter] public int ActivityId { get; set; }
@@ -352,7 +335,9 @@
     // ---- Data ----
     private ActivityDto? activity;
     private List<DocumentDto> activityDocuments = [];
-    private SubmissionDto? existingSubmission;
+    private SubmissionDetailDto? existingSubmission;
+    private IEnumerable<SubmissionCommentDto> TeacherComments =>
+        existingSubmission?.Comments.Where(c => c.AuthorId != existingSubmission.StudentId) ?? Enumerable.Empty<SubmissionCommentDto>();
 
     // ---- Page state ----
     private bool isLoading;
@@ -368,32 +353,53 @@
 
     // ---- Form state ----
     private string submissionBody = string.Empty;
-    private SubmissionTab submissionTab = SubmissionTab.Text;
+    private UploadDocumentValue documentUpload = new();
+
     private bool isSubmitting;
     private bool showResubmitForm;
     private Dictionary<string, string> formErrors = new();
 
     // ---- Lifecycle ----
-    protected override async Task OnInitializedAsync()
-        => await LoadActivityAsync();
+    private int? loadedActivityId;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (loadedActivityId != ActivityId)
+        {
+            loadedActivityId = ActivityId;
+            await LoadActivityAsync();
+        }
+    }
 
     private async Task LoadActivityAsync()
     {
         isLoading = true;
         loadError = null;
+        successMessage = null;
+        errorMessage = null;
+
         StateHasChanged();
 
         try
         {
             activity = await ActivityService.GetActivityByIdAsync(ActivityId);
 
-            // TODO: once ISubmissionService is added to client, load existing submission:
-            // existingSubmission = await SubmissionService.GetMySubmissionForActivityAsync(ActivityId);
-            // For now, existingSubmission stays null.
+            existingSubmission = null;
+            submissionBody = string.Empty;
+            showResubmitForm = false;
 
-            // TODO: load activityDocuments once detail endpoint is wired:
-            // var detail = await ActivityService.GetActivityDetailByIdAsync(ActivityId);
-            // activityDocuments = detail?.Documents ?? [];
+            var detail = await ActivityService.GetActivityDetailByIdAsync(ActivityId);
+            activityDocuments = detail?.Documents ?? [];
+
+            var baseSubmission = detail?.Submissions
+                .OrderByDescending(s => s.SubmittedAt)
+                .FirstOrDefault();
+
+            if (baseSubmission is not null)
+            {
+                existingSubmission = await SubmissionService.GetSubmissionDetailByIdAsync(baseSubmission.Id);
+                PopulateFormFromExistingSubmission();
+            }
         }
         catch (Exception ex)
         {
@@ -404,6 +410,47 @@
             isLoading = false;
         }
     }
+
+    private void PopulateFormFromExistingSubmission()
+    {
+        submissionBody = existingSubmission?.Body ?? string.Empty;
+
+        if (existingSubmission?.Document is not null)
+        {
+            documentUpload = new UploadDocumentValue
+            {
+                Description = existingSubmission.Document.Description ?? string.Empty,
+                ExistingContentType = existingSubmission.Document.ContentType,
+                ExistingFileName = existingSubmission.Document.DisplayName,
+                ExistingDocumentId = existingSubmission.Document.Id,
+                RemoveExistingDocument = false,
+                File = null
+            };
+        }
+        else
+        {
+            documentUpload = new UploadDocumentValue();
+        }
+    }
+
+    private void ToggleEditSubmission()
+    {
+        if (!showResubmitForm)
+        {
+            PopulateFormFromExistingSubmission();
+            formErrors.Clear();
+            errorMessage = null;
+            successMessage = null;
+        }
+
+        showResubmitForm = !showResubmitForm;
+    }
+
+    // private Task OnDocumentChanged(UploadDocumentValue? value)
+    // {
+    //     documentUpload = value ?? new UploadDocumentValue();
+    //     return Task.CompletedTask;
+    // }
 
     // ---- Submit ----
     private async Task SubmitAsync()
@@ -416,43 +463,47 @@
         {
             if (existingSubmission is null)
             {
-                // TODO: replace with real call once ISubmissionService is on the client:
-                // var dto = new CreateSubmissionDto
-                // {
-                //     StudentId  = currentUserId,   // from auth state
-                //     ActivityId = ActivityId,
-                //     Body       = submissionTab == SubmissionTab.Text ? submissionBody : null
-                // };
-                // existingSubmission = await SubmissionService.CreateSubmissionAsync(dto);
-
-                // Optimistic local stand-in
-                existingSubmission = new SubmissionDto
+                var dto = new CreateSubmissionDto
                 {
-                    Id = 0,
-                    StudentId = "current-user",
-                    StudentName = "You",
                     ActivityId = ActivityId,
-                    ActivityName = activity!.Name,
-                    Body = submissionTab == SubmissionTab.Text ? submissionBody : null,
-                    SubmittedAt = DateTime.Now,
-                    IsLate = isOverdue
+                    Body = submissionBody,
+                    FileDescription = documentUpload.Description,
+                    RemoveFile = documentUpload.RemoveExistingDocument
                 };
 
+                errorMessage = null;
+
+                var createdSubmission = await SubmissionService.CreateSubmissionAsync(dto, documentUpload);
+
+                if (createdSubmission is null)
+                {
+                    errorMessage = "Could not create submission.";
+                    return;
+                }
                 successMessage = "Your submission has been recorded! 🎉";
+                existingSubmission = await SubmissionService.GetSubmissionDetailByIdAsync(createdSubmission.Id);
             }
             else
             {
-                // TODO: call UpdateSubmissionAsync once wired
-                existingSubmission = existingSubmission with
+                var dto = new UpdateSubmissionDto
                 {
-                    Body = submissionTab == SubmissionTab.Text ? submissionBody : existingSubmission.Body,
-                    SubmittedAt = DateTime.Now
+                    ActivityId = ActivityId,
+                    Body = submissionBody,
+                    FileDescription = documentUpload.Description,
+                    RemoveFile = documentUpload.RemoveExistingDocument
                 };
+                var updatedSubmission = await SubmissionService.UpdateSubmissionAsync(existingSubmission.Id, dto, documentUpload);
+                if (updatedSubmission is null)
+                {
+                    errorMessage = "Could not update submission.";
+                    return;
+                }
                 successMessage = "Your submission has been updated.";
+                existingSubmission = await SubmissionService.GetSubmissionDetailByIdAsync(updatedSubmission.Id);
             }
 
             showResubmitForm = false;
-            submissionBody = string.Empty;
+            PopulateFormFromExistingSubmission();
         }
         catch (Exception ex)
         {
@@ -469,8 +520,12 @@
     {
         var errors = new Dictionary<string, string>();
 
-        if (submissionTab == SubmissionTab.Text && string.IsNullOrWhiteSpace(submissionBody))
-            errors["Body"] = "Please write something before submitting.";
+        var hasBody = !string.IsNullOrWhiteSpace(submissionBody);
+        var hasNewFile = documentUpload.HasFile;
+        var keepsExistingFile = existingSubmission?.Document is not null && !documentUpload.RemoveExistingDocument && !hasNewFile;
+
+        if (!hasBody && !hasNewFile && !keepsExistingFile)
+            errors["Body"] = "Please add text or attach a file before submitting.";
 
         return errors;
     }
@@ -478,7 +533,7 @@
     // ---- Helpers ----
     private void HandleFilePicked(ChangeEventArgs e) { /* file upload not yet supported */ }
 
-    private void GoBack() => Navigation.NavigateTo("/student/dashboard");
+    private void GoBack() => Navigation.NavigateTo("/student/overview");
 
     private static string FormatTimeRemaining(TimeSpan t)
     {
@@ -489,14 +544,18 @@
         return $"{t.Minutes}m remaining";
     }
 
-    private static string GetActivityTypeBadge(ActivityType type) => type switch
+    private static string GetActivityTypeBadge(string typeName) => typeName switch
     {
-        ActivityType.Assignment => "bg-warning text-dark",
-        ActivityType.Exercise => "bg-danger",
-        ActivityType.Lecture => "bg-primary",
-        ActivityType.ELearning => "bg-success",
+        "Assignment" => "bg-warning text-dark",
+        "Exercise" => "bg-danger",
+        "Lecture" => "bg-primary",
+        "E-Learning" => "bg-success",
         _ => "bg-secondary"
     };
 
-    private enum SubmissionTab { Text, File }
+    private void HandleDocumentDeleted(int _)
+    {
+        if (existingSubmission is not null)
+            existingSubmission = existingSubmission with { Document = null };
+    }
 }

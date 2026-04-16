@@ -1,10 +1,10 @@
-﻿namespace LMS.Shared.DTOs.Document
+namespace LMS.Shared.DTOs.Document
 {
     /// <summary>
     /// Represents a document attached to a course, module, or activity.
     /// Documents can be associated with one of three scopes: Course, Module, or Activity.
     /// </summary>
-    public record DocumentDto
+    public class DocumentDto
     {
         public required int Id { get; init; }
         /// <summary>
@@ -14,6 +14,7 @@
         public long FileSize { get; init; }
         public required string DisplayName { get; init; }
         public required string Description { get; init; }
+        public required string ContentType { get; init; }
 
         /// <summary>
         /// Date and time when the document was uploaded.
@@ -32,9 +33,15 @@
         /// </summary>
         public required string UploadedByUserName { get; init; }
         public int? CourseId { get; init; }
+        public string? CourseName { get; init; }
         public int? ModuleId { get; init; }
+        public string? ModuleName { get; init; }
         public int? ActivityId { get; init; }
+        public string? ActivityName { get; init; }
         public int? SubmissionId { get; init; }
         public required string Scope { get; init; }
+        public int? ParentCourseId { get; init; }
+        public int? ParentModuleId { get; init; }
+        public int? ParentActivityId { get; init; }
     }
 }

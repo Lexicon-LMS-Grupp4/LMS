@@ -1,5 +1,5 @@
-@page "/modules"
-@page "/modules/{CourseId:int}"
+@page "/courses/{CourseId:int}"
+@page "/admin/courses/{CourseId:int}"
 @using LMS.Blazor.Client.Components.Module
 @using LMS.Blazor.Client.Components.Course
 @using LMS.Shared.DTOs.Module
@@ -8,15 +8,12 @@
 @inject LMS.Blazor.Client.Services.ICourseService CourseService
 @inject LMS.Blazor.Client.Services.IModuleService ModuleService
 @inject LMS.Blazor.Client.Services.IApiService ApiService
+@inject NavigationManager Nav
+@inject AuthenticationStateProvider AuthStateProvider
 
-<div class="py-5" style="margin: 0 !important; margin-left: -1.5rem !important; max-width: none !important; padding-left: 0 !important;">
-
+<div class="py-5" style="margin: 0 !important; max-width: none !important; padding: 0 0 1em 0 !important;">
     <div class="row g-0" style="margin: 0 !important;">
-        <aside class="col-auto mb-5 pe-4" style="min-width: 180px; margin-left: 0 !important;">
-            <CourseNav />
-        </aside>
-
-        <main class="col-md-10">
+        <main class="col-md-12">
             <BbBreadcrumb Class="mb-4">
                 <BbBreadcrumbItem><BbBreadcrumbLink Href="/">Home</BbBreadcrumbLink></BbBreadcrumbItem>
                 <BbBreadcrumbSeparator />
@@ -44,9 +41,12 @@
                         <p class="text-muted mb-0">@modules.Count modules · @modules.Count(IsActive) active now</p>
                     </div>
                 <div class="d-flex align-items-center gap-3">
-                    <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" OnClick="ToggleRole">
-                        @(isTeacher ? "Switch to Student" : "Switch to Teacher")
-                    </BbButton>
+                    @if (canSwitchRoles)
+                    {
+                        <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" OnClick="ToggleRole">
+                            @(isTeacher ? "Switch to Student" : "Switch to Teacher")
+                        </BbButton>
+                    }
                     @if (isTeacher)
                     {
                         <BbButton Size="ButtonSize.Small" OnClick="OpenCreateDialog">+ Add Module</BbButton>
@@ -60,13 +60,14 @@
                             OnCycleGradient="CycleGradient"
                             OnEdit="OpenEditDialog"
                             OnDelete="DeleteModule"
-                            OnViewActivities="ViewActivities" />
+                            OnGoToModule="GoToModule" />
 
                 <ModuleDialog @bind-Open="isDialogOpen"
-                              IsEditing="isEditing"
-                              CourseStartDate="course?.StartDate"
-                              Module="editingModule"
-                              OnSave="SaveModule" />
+                               IsEditing="isEditing"
+                               CourseStartDate="course?.StartDate"
+                               ExistingModules="modules"
+                               Module="editingModule"
+                               OnSave="SaveModule" />
             }
         </main>
     </div>
@@ -75,7 +76,7 @@
 @code {
     [Parameter] public int? CourseId { get; set; }
 
-    private bool isTeacher, isDialogOpen, isEditing;
+    private bool isTeacher, isDialogOpen, isEditing, canSwitchRoles;
     private Dictionary<int, int> gradientIndex = new();
 
     private CourseDto? course;
@@ -85,6 +86,23 @@
     private ModuleDto editingModule = new() { Id = 0, Name = "", Description = "", CourseId = 0, CourseName = "", StartDate = DateTime.Now, EndDate = DateTime.Now.AddDays(14) };
 
     private List<ModuleDto> modules = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        
+        if (user.IsInRole("Teacher"))
+        {
+            isTeacher = true;
+            canSwitchRoles = true;
+        }
+        else
+        {
+            isTeacher = false;
+            canSwitchRoles = false;
+        }
+    }
 
     protected override async Task OnParametersSetAsync()
     {
@@ -137,8 +155,18 @@
         }
     }
 
-    private void ToggleRole() => isTeacher = !isTeacher;
+    private void ToggleRole() 
+    {
+        isTeacher = !isTeacher;
+        isDialogOpen = false;
+    }
     private void CycleGradient(int id) => gradientIndex[id] = (gradientIndex.GetValueOrDefault(id, id % ModuleStyles.Gradients.Length) + 1) % ModuleStyles.Gradients.Length;
+    
+    private void GoToModule(int id) =>
+     Nav.NavigateTo(isTeacher
+         ? $"/admin/modules/{id}/details"
+         : $"/modules/{id}/details");
+    // private bool IsActive(ModuleDto m) => m.StartDate <= DateTime.Now && (!m.EndDate.HasValue || m.EndDate >= DateTime.Now);
     
     private async Task DeleteModule(int id)
     {
@@ -153,13 +181,28 @@
         }
     }
 
-    private void ViewActivities(int id) { /* NavigationManager.NavigateTo(...) */ }
-    private bool IsActive(ModuleDto m) => m.StartDate <= DateTime.Now && m.EndDate >= DateTime.Now;
+
+    private bool IsActive(ModuleDto m) => m.EndDate >= m.StartDate && m.StartDate <= DateTime.Now && m.EndDate >= DateTime.Now;
 
     private void OpenCreateDialog()
     {
         isEditing = false;
-        editingModule = new() { Id = 0, Name = "", Description = "", CourseId = course?.Id ?? CourseId ?? 0, CourseName = course?.Name ?? "", StartDate = DateTime.Now, EndDate = DateTime.Now.AddDays(14) };
+        
+        // Smart default: if course starts in future, default to course start.
+        // Otherwise use today.
+        var today = DateTime.Today;
+        var defaultStart = (course?.StartDate > today) ? course.StartDate : today;
+        
+        editingModule = new() 
+        { 
+            Id = 0, 
+            Name = "", 
+            Description = "", 
+            CourseId = course?.Id ?? CourseId ?? 0, 
+            CourseName = course?.Name ?? "", 
+            StartDate = defaultStart, 
+            EndDate = defaultStart.AddDays(14) 
+        };
         isDialogOpen = true;
     }
 

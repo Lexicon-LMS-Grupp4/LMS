@@ -1,7 +1,4 @@
-﻿using Domain.Models.Enums;
-using System;
-
-namespace LMS.Shared.DTOs.Activity
+﻿namespace LMS.Shared.DTOs.Activity
 {
     /// <summary>
     /// Data transfer object for updating an existing activity.
@@ -11,7 +8,7 @@ namespace LMS.Shared.DTOs.Activity
     {
         public string Name { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;
-        public ActivityType Type { get; set; }
+        public int ActivityTypeId { get; set; }
         public DateTime StartTime { get; set; }
         public DateTime EndTime { get; set; }
     }

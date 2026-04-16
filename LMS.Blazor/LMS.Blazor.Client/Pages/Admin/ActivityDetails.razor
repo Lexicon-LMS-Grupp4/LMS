@@ -1,10 +1,17 @@
-﻿@page "/admin/activities/{ActivityId:int}/details"
+@page "/admin/activities/{ActivityId:int}/details"
 @attribute [Authorize(Roles = "Teacher")]
+@using LMS.Blazor.Client.Components
+@using LMS.Blazor.Client.Components.Activity
 @using LMS.Shared.DTOs.Activity
+@using LMS.Shared.DTOs.ActivityType
 @using LMS.Shared.DTOs.Document
 @using LMS.Shared.DTOs.Submission
-@using Domain.Models.Enums
+@using LMS.Blazor.Client.Uploads
+@using LMS.Blazor.Client.Components.Document
 @inject IActivityService ActivityService
+@inject IActivityTypeService ActivityTypeService
+@inject IDocumentService DocumentService
+@inject ISubmissionService SubmissionService
 @inject NavigationManager Navigation
 
 <PageTitle>Activity Details</PageTitle>
@@ -14,10 +21,23 @@
     @* ---- Header ---- *@
     <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
         <h2 class="mb-0">Activity Details</h2>
-        <button class="btn btn-outline-secondary" @onclick="GoBack">
-            <i class="bi bi-arrow-left"></i>
-            <span class="d-none d-md-inline ms-1">Back to Module</span>
-        </button>
+        <div class="d-flex gap-2 flex-wrap align-items-center">
+            @if (activity is not null)
+            {
+                <button class="btn btn-sm btn-outline-secondary" @onclick="OpenActivityTypeDialog">
+                    <i class="bi bi-tag"></i>
+                    <span class="d-none d-md-inline ms-1">Add Type</span>
+                </button>
+                <button class="btn btn-sm btn-primary" @onclick="OpenEditDialog">
+                    <i class="bi bi-pencil"></i>
+                    <span class="d-none d-md-inline ms-1">Edit Activity</span>
+                </button>
+            }
+            <button class="btn btn-outline-secondary" @onclick="GoBack">
+                <i class="bi bi-arrow-left"></i>
+                <span class="d-none d-md-inline ms-1">Back to Module</span>
+            </button>
+        </div>
     </div>
 
     @* ---- Feedback ---- *@
@@ -66,7 +86,7 @@
             <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
                 <h5 class="mb-0">@activity.Name</h5>
                 <div class="d-flex gap-2 flex-wrap align-items-center">
-                    <span class="badge @GetActivityTypeBadge(activity.Type) fs-6">@activity.Type</span>
+                    <span class="badge @ActivityHelpers.GetActivityTypeBadge(activity.ActivityTypeName) fs-6">@activity.ActivityTypeName</span>
                     <span class="badge bg-secondary">@submissions.Count Submissions</span>
                     <span class="badge bg-info text-dark">@documents.Count Documents</span>
                 </div>
@@ -83,7 +103,7 @@
                     </div>
                     <div class="col-md-2 col-6">
                         <p class="text-muted mb-1 small">Start</p>
-                        <p class="mb-0">@activity.StartTime.ToString("yyyy-MM-dd HH:mm")</p>
+                        <p class="mb-0">@activity.StartTime?.ToString("yyyy-MM-dd HH:mm")</p>
                     </div>
                     <div class="col-md-2 col-6">
                         <p class="text-muted mb-1 small">End / Deadline</p>
@@ -102,183 +122,203 @@
         @* ==============================
            SUBMISSIONS SECTION
            ============================== *@
-        <div class="card mb-4">
-            <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
-                <h6 class="mb-0"><i class="bi bi-send me-2"></i>Submissions</h6>
-                @if (submissions.Any())
-                {
-                    <div class="d-flex gap-2 flex-wrap align-items-center">
-                        <span class="text-muted small">
-                            @* TODO: implement new submission comments *@
-                            @* @submissions.Count(s => s.FeedbackText is not null) / @submissions.Count reviewed *@
-                        </span>
-                        <span class="badge bg-danger">
-                            @submissions.Count(s => s.IsLate) Late
-                        </span>
+        @if (activity?.ActivityTypeName == "Assignment")
+        {
+            <div class="card mb-4">
+                <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+                    <div class="d-flex align-items-center gap-3 flex-wrap">
+                        <h6 class="mb-0"><i class="bi bi-send me-2"></i>Submissions</h6>
+                        @if (submissions.Any())
+                        {
+                            <span class="badge bg-danger">@submissions.Count(s => s.IsLate) Late</span>
+                        }
                     </div>
-                }
-            </div>
+                    <div style="min-width:260px;">
+                        <input class="form-control form-control-sm"
+                               placeholder="Search by student name or ID"
+                               @bind="studentFilter"
+                               @bind:event="oninput" />
+                    </div>
+                </div>
 
-            <div class="card-body p-0">
-                @if (!submissions.Any())
-                {
-                    <p class="text-muted p-3 mb-0">No submissions yet for this activity.</p>
-                }
-                else
-                {
-                    <div class="table-responsive">
-                        <table class="table table-hover mb-0 align-middle">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>Student</th>
-                                    <th class="d-none d-md-table-cell">Submitted</th>
-                                    <th class="d-none d-sm-table-cell">Status</th>
-                                    <th class="d-none d-lg-table-cell">Body</th>
-                                    <th>Feedback</th>
-                                    <th style="width:80px;"></th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach (var sub in submissions)
-                                {
-                                    <tr class="@(expandedSubmissionId == sub.Id ? "table-active" : "")">
-                                        <td>
-                                            <div class="fw-semibold">@sub.StudentName</div>
-                                            <div class="text-muted small">@sub.StudentId</div>
-                                        </td>
-                                        <td class="d-none d-md-table-cell text-muted small">
-                                            @sub.SubmittedAt.ToString("yyyy-MM-dd HH:mm")
-                                        </td>
-                                        <td class="d-none d-sm-table-cell">
-                                            @if (sub.IsLate)
-                                            {
-                                                <span class="badge bg-danger">Late</span>
-                                            }
-                                            else
-                                            {
-                                                <span class="badge bg-success">On time</span>
-                                            }
-                                        </td>
-                                        <td class="d-none d-lg-table-cell">
-                                            @if (!string.IsNullOrEmpty(sub.Body))
-                                            {
-                                                <span class="text-truncate d-inline-block" style="max-width:180px;">
-                                                    @sub.Body
-                                                </span>
-                                            }
-                                            else if (sub.DocumentId is not null)
-                                            {
-                                                <span class="text-muted small">
-                                                    <i class="bi bi-file-earmark me-1"></i>Attachment
-                                                </span>
-                                            }
-                                            else
-                                            {
-                                                <span class="text-muted small">—</span>
-                                            }
-                                        </td>
-                                        <td>
-                                            @* TODO: implement new submission comments *@
-                                            @* @if (sub.FeedbackText is not null)
-                                            {
-                                                <span class="badge bg-success">
-                                                    <i class="bi bi-check-lg me-1"></i>Given
-                                                </span>
-                                            }
-                                            else
-                                            {
-                                                <span class="badge bg-warning text-dark">Pending</span>
-                                            } *@
-                                        </td>
-                                        <td class="text-end text-nowrap">
-                                            <button class="btn btn-sm @(expandedSubmissionId == sub.Id ? "btn-primary" : "btn-outline-primary")"
-                                                    title="@(expandedSubmissionId == sub.Id ? "Collapse" : "Review")"
-                                                    @onclick="() => ToggleSubmission(sub.Id)">
-                                                <i class="bi bi-@(expandedSubmissionId == sub.Id ? "chevron-up" : "chat-left-text")"></i>
-                                            </button>
-                                        </td>
+                <div class="card-body p-0">
+                    @if (!FilteredSubmissions.Any())
+                    {
+                        <p class="text-muted p-3 mb-0">
+                            @(string.IsNullOrWhiteSpace(studentFilter)
+                                ? "No submissions yet for this activity."
+                                : "No submissions match that student filter.")
+                        </p>
+                    }
+                    else
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0 align-middle">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Student</th>
+                                        <th class="d-none d-md-table-cell">Submitted</th>
+                                        <th class="d-none d-sm-table-cell">Status</th>
+                                        <th class="d-none d-lg-table-cell">Body</th>
+                                        <th>Feedback</th>
+                                        <th style="width:80px;"></th>
                                     </tr>
-
-                                    @* ---- Expanded feedback panel ---- *@
-                                    @if (expandedSubmissionId == sub.Id)
+                                </thead>
+                                <tbody>
+                                    @foreach (var sub in FilteredSubmissions)
                                     {
-                                        <tr class="table-active">
-                                            <td colspan="7" class="pt-0">
-                                                <div class="bg-white border rounded p-3 mt-1">
-                                                    <div class="row g-3">
-
-                                                        @* Submission content *@
-                                                        <div class="col-md-6">
-                                                            <p class="small fw-semibold text-muted mb-1">Submission Content</p>
-                                                            @if (!string.IsNullOrEmpty(sub.Body))
-                                                            {
-                                                                <div class="border rounded p-2 bg-light small" style="white-space:pre-wrap;">@sub.Body</div>
-                                                            }
-                                                            else if (sub.Document is not null)
-                                                            {
-                                                                <div class="d-flex align-items-center gap-2 border rounded p-2 bg-light">
-                                                                    <i class="bi bi-file-earmark-text fs-4 text-muted"></i>
-                                                                    <div>
-                                                                        <div class="fw-semibold small">@sub.Document.DisplayName</div>
-                                                                    </div>
-                                                                </div>
-                                                            }
-                                                            else
-                                                            {
-                                                                <p class="text-muted small">No content provided.</p>
-                                                            }
-                                                        </div>
-
-                                                        @* Feedback form *@
-                                                        <div class="col-md-6">
-                                                            @* TODO: implement new submission comments *@
-                                                            @* <p class="small fw-semibold text-muted mb-1">
-                                                                @(sub.feedbacktext is not null ? "feedback (already given)" : "give feedback")
-                                                            </p>
-
-                                                            @if (sub.FeedbackText is not null)
-                                                            {
-                                                                <div class="border rounded p-2 bg-light small mb-2" style="white-space:pre-wrap;">
-                                                                    @sub.FeedbackText
-                                                                </div>
-                                                                <p class="text-muted small mb-0">
-                                                                    Given at @sub.FeedbackGivenAt?.ToString("yyyy-MM-dd HH:mm")
-                                                                </p>
-                                                            }
-                                                            else
-                                                            {
-                                                                <textarea class="form-control form-control-sm mb-2"
-                                                                          rows="4"
-                                                                          placeholder="Write your feedback here..."
-                                                                          @bind="feedbackDrafts[sub.Id]">
-                                                                </textarea>
-                                                                @if (feedbackErrors.TryGetValue(sub.Id, out var fbErr))
-                                                                {
-                                                                    <p class="text-danger small mt-1">@fbErr</p>
-                                                                }
-                                                                <button class="btn btn-sm btn-success"
-                                                                        @onclick="() => SubmitFeedbackAsync(sub.Id)"
-                                                                        disabled="@(submittingFeedbackId == sub.Id)">
-                                                                    @if (submittingFeedbackId == sub.Id)
-                                                                    {
-                                                                        <span class="spinner-border spinner-border-sm me-1"></span>
-                                                                    }
-                                                                    Submit Feedback
-                                                                </button>
-                                                            } *@
-                                                        </div>
-                                                    </div>
-                                                </div>
+                                        <tr class="@(expandedSubmissionId == sub.Id ? "table-active" : "")">
+                                            <td>
+                                                <div class="fw-semibold">@sub.StudentName</div>
+                                                <div class="text-muted small">@sub.StudentId</div>
+                                            </td>
+                                            <td class="d-none d-md-table-cell text-muted small">
+                                                @sub.SubmittedAt.ToString("yyyy-MM-dd HH:mm")
+                                            </td>
+                                            <td class="d-none d-sm-table-cell">
+                                                @if (sub.IsLate)
+                                                {
+                                                    <span class="badge bg-danger">Late</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge bg-success">On time</span>
+                                                }
+                                            </td>
+                                            <td class="d-none d-lg-table-cell">
+                                                @if (!string.IsNullOrEmpty(sub.Body))
+                                                {
+                                                    <span class="text-truncate d-inline-block" style="max-width:180px;">@sub.Body</span>
+                                                }
+                                                else if (sub.DocumentId is not null)
+                                                {
+                                                    <span class="text-muted small"><i class="bi bi-file-earmark me-1"></i>Attachment</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="text-muted small">—</span>
+                                                }
+                                            </td>
+                                            <td>
+                                                @if (sub.CommentCount > 0)
+                                                {
+                                                    <span class="badge bg-info text-dark">@sub.CommentCount</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="text-muted small">None</span>
+                                                }
+                                            </td>
+                                            <td class="text-end text-nowrap">
+                                                <button class="btn btn-sm @(expandedSubmissionId == sub.Id ? "btn-primary" : "btn-outline-primary")"
+                                                        title="@(expandedSubmissionId == sub.Id ? "Collapse" : "Review")"
+                                                        @onclick="() => ToggleSubmission(sub.Id)">
+                                                    <i class="bi bi-@(expandedSubmissionId == sub.Id ? "chevron-up" : "chat-left-text")"></i>
+                                                </button>
                                             </td>
                                         </tr>
+
+                                        @* ---- Expanded feedback panel ---- *@
+                                        @if (expandedSubmissionId == sub.Id)
+                                        {
+                                            <tr class="table-active">
+                                                <td colspan="7" class="pt-0">
+                                                    <div class="bg-white border rounded p-3 mt-1">
+                                                        <div class="row g-3">
+                                                            <div class="col-md-6">
+                                                                <p class="small fw-semibold text-muted mb-1">Submission Content</p>
+                                                                @if (!string.IsNullOrEmpty(sub.Body))
+                                                                {
+                                                                    <div class="border rounded p-2 bg-light small mb-2" style="white-space:pre-wrap;">@sub.Body</div>
+                                                                }
+                                                                
+                                                                @if (sub.Document is not null)
+                                                                {
+                                                                    <div class="border rounded p-3 bg-light mb-2">
+                                                                        <div class="small text-muted mb-1">Attached file</div>
+                                                                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                                                                            <div>
+                                                                                <div class="fw-semibold">@sub.Document.DisplayName</div>
+                                                                                @if (!string.IsNullOrWhiteSpace(sub.Document.Description))
+                                                                                {
+                                                                                    <div class="text-muted small">@sub.Document.Description</div>
+                                                                                }
+                                                                            </div>
+                                                                            <a class="btn btn-sm btn-primary"
+                                                                               href="@DocumentService.GetDocumentFileUrl(sub.Document.Id, true)"
+                                                                               target="_blank">
+                                                                                <i class="bi bi-download me-1"></i>Download file
+                                                                            </a>
+                                                                        </div>
+                                                                    </div>
+                                                                }
+                                                                
+                                                                @if (string.IsNullOrEmpty(sub.Body) && sub.Document is null)
+                                                                {
+                                                                    <p class="text-muted small">No content provided.</p>
+                                                                }
+                                                            </div>
+                                                            <div class="col-md-6">
+                                                                <p class="small fw-semibold text-muted mb-1">Feedback</p>
+                                                                @if (loadingSubmissionDetailId == sub.Id)
+                                                                {
+                                                                    <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+                                                                }
+                                                                else if (submissionDetails.TryGetValue(sub.Id, out var detail))
+                                                                {
+                                                                    @if (detail.Comments.Any())
+                                                                    {
+                                                                        <div class="mb-3">
+                                                                            @foreach (var c in detail.Comments.OrderBy(c => c.CreatedAt))
+                                                                            {
+                                                                                <div class="border rounded p-2 @(c.AuthorId == sub.StudentId ? "bg-warning bg-opacity-10" : "bg-light") small mb-2">
+                                                                                    <div class="d-flex justify-content-between mb-1">
+                                                                                        <span class="fw-semibold">@(c.AuthorId == sub.StudentId ? $"{c.AuthorName} (Resubmission)" : c.AuthorName)</span>
+                                                                                        <span class="text-muted" style="font-size: 0.75rem;">@c.CreatedAt.ToString("g")</span>
+                                                                                    </div>
+                                                                                    <div style="white-space:pre-wrap;">@c.Text</div>
+                                                                                    @if (c.AuthorId == sub.StudentId && sub.Document is not null)
+                                                                                    {
+                                                                                        <div class="mt-2">
+                                                                                            <a class="btn btn-sm btn-outline-primary"
+                                                                                               href="@DocumentService.GetDocumentFileUrl(sub.Document.Id, true)"
+                                                                                               target="_blank">
+                                                                                                <i class="bi bi-download me-1"></i>Download current file
+                                                                                            </a>
+                                                                                        </div>
+                                                                                    }
+                                                                                </div>
+                                                                            }
+                                                                        </div>
+                                                                    }
+                                                                    
+                                                                    <div class="d-flex flex-column gap-2">
+                                                                        <textarea class="form-control form-control-sm"
+                                                                                  rows="3"
+                                                                                  placeholder="Write feedback..."
+                                                                                  @bind="feedbackDrafts[sub.Id]"
+                                                                                  @bind:event="oninput"></textarea>
+                                                                        <button class="btn btn-sm btn-primary align-self-end"
+                                                                                disabled="@string.IsNullOrWhiteSpace(feedbackDrafts[sub.Id])"
+                                                                                @onclick="() => SendFeedbackAsync(sub.Id)">
+                                                                            <i class="bi bi-send me-1"></i>Send Feedback
+                                                                        </button>
+                                                                    </div>
+                                                                }
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        }
                                     }
-                                }
-                            </tbody>
-                        </table>
-                    </div>
-                }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </div>
             </div>
-        </div>
+        }
 
         @* ==============================
            DOCUMENTS SECTION
@@ -296,11 +336,10 @@
             @if (showUploadDocument)
             {
                 <div class="card-body border-bottom bg-light">
-                    <div class="alert alert-info mb-0 py-2">
-                        <i class="bi bi-info-circle me-2"></i>
-                        Document upload requires an authenticated user context
-                        (<code>UploadedByUserId</code>) — not yet wired up on this page.
-                    </div>
+                    <UploadDocumentField 
+                        Label="Select Document"
+                        @bind-Value="documentUpload"
+                        HandleSubmit="SaveDocumentAsync" />
                 </div>
             }
 
@@ -313,38 +352,21 @@
                 {
                     <div class="table-responsive">
                         <table class="table table-hover mb-0">
-                            <thead class="table-light">
+                             <thead class="table-light">
                                 <tr>
-                                    <th>Name</th>
-                                    <th class="d-none d-md-table-cell">File</th>
-                                    <th class="d-none d-sm-table-cell">Uploaded</th>
-                                    <th class="d-none d-sm-table-cell">By</th>
-                                    <th style="width:60px;"></th>
+                                    <th style="width:100%"></th>
+                                    <th></th>
                                 </tr>
                             </thead>
                             <tbody>
                                 @foreach (var doc in documents)
                                 {
                                     <tr>
-                                        <td>
-                                            <div class="fw-semibold">@doc.DisplayName</div>
-                                            @if (!string.IsNullOrEmpty(doc.Description))
-                                            {
-                                                <div class="text-muted small text-truncate" style="max-width:200px;">@doc.Description</div>
-                                            }
+                                        <td class="align-middle" colspan="4">
+                                            <DocumentWithDownload Document="doc" />
                                         </td>
-                                        <td class="d-none d-md-table-cell text-muted small">
-                                            <i class="bi bi-file-earmark me-1"></i>@doc.DisplayName
-                                        </td>
-                                        <td class="d-none d-sm-table-cell text-muted small">
-                                            @doc.UploadedAt.ToString("yyyy-MM-dd")
-                                        </td>
-                                        <td class="d-none d-sm-table-cell text-muted small">
-                                            @doc.UploadedByUserName
-                                        </td>
-                                        <td class="text-end">
+                                        <td class="align-middle text-end pe-3">
                                             <button class="btn btn-sm btn-outline-danger"
-                                                    title="Remove"
                                                     @onclick="() => HandleDeleteDocument(doc)">
                                                 <i class="bi bi-trash"></i>
                                             </button>
@@ -359,6 +381,26 @@
         </div>
     }
 </div>
+
+@* ---- Edit Activity dialog (reuses the shared ActivityDialog with module selection hidden) ---- *@
+<ActivityDialog @bind-Open="editDialogOpen"
+                IsEditing="true"
+                HideModuleSelection="true"
+                Model="editFormModel"
+                ActivityTypes="activityTypes"
+                OnSave="HandleEditSave"
+                OnAddActivityType="OpenActivityTypeDialog"
+                OnDeleteActivityType="HandleDeleteActivityType"
+                ActivityTypeError="@activityTypeError" />
+
+@* ---- Activity Type dialog ---- *@
+<ActivityTypeDialog @bind-Open="activityTypeDialogOpen"
+                    @bind-Name="newActivityTypeName"
+                    @bind-Description="newActivityTypeDescription"
+                    Error="@activityTypeError"
+                    IsSaving="isCreatingActivityType"
+                    OnSave="HandleCreateActivityType"
+                    OnCancel="() => activityTypeError = null" />
 
 @* ---- Delete Document modal ---- *@
 @if (showDeleteDocumentConfirm && documentToDelete is not null)
@@ -388,6 +430,7 @@
     private ActivityDetailDto? activity;
     private List<SubmissionDto> submissions = [];
     private List<DocumentDto> documents = [];
+    private List<ActivityTypeDto> activityTypes = [];
 
     // ---- Page state ----
     private bool isLoading;
@@ -395,20 +438,41 @@
     private string? successMessage;
     private string? errorMessage;
 
-    // ---- Submissions / feedback ----
+    // ---- Submissions ----
     private int? expandedSubmissionId;
-    private Dictionary<int, string> feedbackDrafts = new();
-    private Dictionary<int, string> feedbackErrors = new();
-    private int? submittingFeedbackId;
+    private string studentFilter = string.Empty;
+
+    // ---- Edit dialog ----
+    private bool editDialogOpen;
+    private ActivityDialog.ActivityFormModel editFormModel = new();
+
+    // ---- Activity Type dialog ----
+    private bool activityTypeDialogOpen;
+    private string newActivityTypeName = string.Empty;
+    private string newActivityTypeDescription = string.Empty;
+    private string? activityTypeError;
+    private bool isCreatingActivityType;
 
     // ---- Documents ----
     private bool showUploadDocument;
     private bool showDeleteDocumentConfirm;
     private DocumentDto? documentToDelete;
+    private UploadDocumentValue documentUpload = new();
+
+    // ---- Feedback drafts ----
+    private Dictionary<int, string> feedbackDrafts = new();
+    private Dictionary<int, SubmissionDetailDto> submissionDetails = new();
+    private int? loadingSubmissionDetailId;
 
     // ---- Lifecycle ----
     protected override async Task OnInitializedAsync()
         => await LoadActivityAsync();
+
+    private IEnumerable<SubmissionDto> FilteredSubmissions =>
+        submissions.Where(s =>
+            string.IsNullOrWhiteSpace(studentFilter) ||
+            s.StudentName.Contains(studentFilter, StringComparison.OrdinalIgnoreCase) ||
+            s.StudentId.Contains(studentFilter, StringComparison.OrdinalIgnoreCase));
 
     private async Task LoadActivityAsync()
     {
@@ -418,27 +482,27 @@
 
         try
         {
-            // GetActivityDetailByIdAsync not yet in IActivityService (client) —
-            // TODO: add it. For now we fall back to basic GetActivityByIdAsync
-            // and leave submissions/documents empty until the detail endpoint is wired.
-            var basic = await ActivityService.GetActivityByIdAsync(ActivityId);
-            if (basic is not null)
+            var typesResult = await ActivityTypeService.GetAllActivityTypesAsync();
+            activityTypes = typesResult?.ToList() ?? [];
+
+            var response = await ActivityService.GetActivityByIdAsync(ActivityId);
+            if (response is not null)
             {
-                // Reconstruct an ActivityDetailDto from the basic dto
                 activity = new ActivityDetailDto
                 {
-                    Id             = basic.Id,
-                    ModuleId       = basic.ModuleId,
-                    ModuleName     = basic.ModuleName,
-                    Name           = basic.Name,
-                    Description    = basic.Description,
-                    Type           = basic.Type,
-                    StartTime      = basic.StartTime,
-                    EndTime        = basic.EndTime,
-                    DocumentCount  = basic.DocumentCount,
-                    SubmissionCount = basic.SubmissionCount,
-                    Documents      = [],
-                    Submissions    = []
+                    Id               = response.Id,
+                    ModuleId         = response.ModuleId,
+                    ModuleName       = response.ModuleName,
+                    Name             = response.Name,
+                    Description      = response.Description,
+                    ActivityTypeId   = response.ActivityTypeId,
+                    ActivityTypeName = response.ActivityTypeName,
+                    StartTime        = response.StartTime,
+                    EndTime          = response.EndTime,
+                    DocumentCount    = response.DocumentCount,
+                    SubmissionCount  = response.SubmissionCount,
+                    Documents        = response.Documents?.ToList() ?? [],
+                    Submissions      = response.Submissions?.ToList() ?? []
                 };
 
                 submissions = activity.Submissions;
@@ -459,54 +523,198 @@
         }
     }
 
-    // ---- Submission / feedback actions ----
-    private void ToggleSubmission(int submissionId)
-    {
-        expandedSubmissionId = expandedSubmissionId == submissionId ? null : submissionId;
+    // ---- Edit dialog ----
 
-        // Ensure a draft slot exists
-        feedbackDrafts.TryAdd(submissionId, string.Empty);
+    private void OpenEditDialog()
+    {
+        activityTypeError = null;
+        if (activity is null) return;
+
+        editFormModel = new()
+        {
+            ModuleId       = activity.ModuleId,
+            Name           = activity.Name,
+            Description    = activity.Description,
+            ActivityTypeId = activity.ActivityTypeId,
+            StartTime      = activity.StartTime,
+            EndTime        = activity.EndTime
+        };
+
+        editDialogOpen = true;
     }
 
-    private async Task SubmitFeedbackAsync(int submissionId)
+    private async Task HandleEditSave()
     {
-        feedbackErrors.Remove(submissionId);
+        if (activity is null) return;
 
-        var draft = feedbackDrafts.GetValueOrDefault(submissionId, string.Empty);
-        if (string.IsNullOrWhiteSpace(draft))
-        {
-            feedbackErrors[submissionId] = "Feedback text cannot be empty.";
-            return;
-        }
-
-        submittingFeedbackId = submissionId;
         try
         {
-            // TODO: wire ISubmissionService to client and call SubmitFeedbackAsync
-            // For now we update the local list optimistically
-            var sub = submissions.FirstOrDefault(s => s.Id == submissionId);
-            // TODO: implement new submission comments
-            // if (sub is not null)
-            // {
-            //     var idx = submissions.IndexOf(sub);
-            //     submissions[idx] = sub with
-            //     {
-            //         FeedbackText    = draft,
-            //         FeedbackGivenAt = DateTime.Now
-            //     };
-            //     feedbackDrafts[submissionId] = string.Empty;
-            //     successMessage = $"Feedback submitted for {sub.StudentName}.";
-            // }
+            await ActivityService.UpdateActivityAsync(activity.Id, new UpdateActivityDto
+            {
+                Name           = editFormModel.Name,
+                Description    = editFormModel.Description,
+                ActivityTypeId = editFormModel.ActivityTypeId,
+                StartTime      = editFormModel.StartTime ?? DateTime.Now,
+                EndTime        = editFormModel.EndTime
+            });
 
-            await Task.CompletedTask;
+            editDialogOpen = false;
+            successMessage = "Activity updated successfully.";
+            await LoadActivityAsync();
         }
         catch (Exception ex)
         {
-            errorMessage = $"Failed to submit feedback. {ex.Message}";
+            errorMessage = $"Failed to update activity. {ex.Message}";
+        }
+    }
+
+    // ---- Activity Type dialog ----
+
+    private void OpenActivityTypeDialog()
+    {
+        newActivityTypeName = string.Empty;
+        newActivityTypeDescription = string.Empty;
+        activityTypeError = null;
+        activityTypeDialogOpen = true;
+    }
+
+    private async Task HandleCreateActivityType()
+    {
+        activityTypeError = null;
+
+        if (string.IsNullOrWhiteSpace(newActivityTypeName))
+        {
+            activityTypeError = "Please enter an activity type name.";
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(newActivityTypeDescription))
+        {
+            activityTypeError = "Please enter an activity type description.";
+            return;
+        }
+
+        isCreatingActivityType = true;
+        try
+        {
+            var created = await ActivityTypeService.CreateActivityTypeAsync(new CreateActivityTypeDto
+            {
+                Name        = newActivityTypeName.Trim(),
+                Description = newActivityTypeDescription
+            });
+
+            if (created is null)
+            {
+                activityTypeError = "Failed to create activity type.";
+                return;
+            }
+
+            var typesResult = await ActivityTypeService.GetAllActivityTypesAsync();
+            activityTypes = typesResult?.ToList() ?? [];
+
+            // Pre-select the new type in the edit form if it's open
+            editFormModel.ActivityTypeId = created.Id;
+
+            activityTypeDialogOpen = false;
+            newActivityTypeName = string.Empty;
+            newActivityTypeDescription = string.Empty;
+            successMessage = $"Activity type '{created.Name}' created.";
+        }
+        catch (Exception ex)
+        {
+            activityTypeError = $"Failed to create activity type. {ex.Message}";
         }
         finally
         {
-            submittingFeedbackId = null;
+            isCreatingActivityType = false;
+        }
+    }
+
+    private async Task HandleDeleteActivityType(int activityTypeId)
+    {
+        try
+        {
+            await ActivityTypeService.DeleteActivityTypeAsync(activityTypeId);
+            var typesResult = await ActivityTypeService.GetAllActivityTypesAsync();
+            activityTypes = typesResult?.ToList() ?? [];
+            editFormModel.ActivityTypeId = 0;
+        }
+        catch (Exception ex)
+        {
+            activityTypeError = $"Cannot delete this activity type: {ex.Message}";
+        }
+    }
+
+    // ---- Toggle submission row ----
+    private async Task ToggleSubmission(int submissionId)
+    {
+        if (expandedSubmissionId == submissionId)
+        {
+            expandedSubmissionId = null;
+            return;
+        }
+
+        expandedSubmissionId = submissionId;
+
+        if (!submissionDetails.ContainsKey(submissionId))
+        {
+            loadingSubmissionDetailId = submissionId;
+            StateHasChanged();
+            
+            var detail = await SubmissionService.GetSubmissionDetailByIdAsync(submissionId);
+            if (detail is not null)
+            {
+                submissionDetails[submissionId] = detail;
+            }
+            loadingSubmissionDetailId = null;
+        }
+
+        if (!feedbackDrafts.ContainsKey(submissionId))
+        {
+            feedbackDrafts[submissionId] = string.Empty;
+        }
+    }
+
+    private async Task SendFeedbackAsync(int submissionId)
+    {
+        if (!feedbackDrafts.TryGetValue(submissionId, out var draft) || string.IsNullOrWhiteSpace(draft))
+            return;
+
+        try
+        {
+            await SubmissionService.SubmitCommentAsync(submissionId, new SubmitCommentDto { CommentText = draft });
+            feedbackDrafts[submissionId] = string.Empty;
+            
+            // Reload the detailed submission to show the new comment
+            var detail = await SubmissionService.GetSubmissionDetailByIdAsync(submissionId);
+            if (detail is not null)
+            {
+                submissionDetails[submissionId] = detail;
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to save feedback: {ex.Message}";
+        }
+    }
+
+    private async Task SaveDocumentAsync()
+    {
+        var createdDocument = await DocumentService.CreateDocumentAsync(new CreateDocumentDto
+        {
+            ActivityId = ActivityId,
+            Description = documentUpload.Description
+        }, documentUpload);
+
+        if (createdDocument is not null)
+        {
+            documents.Add(createdDocument);
+            successMessage = $"Document '{createdDocument.DisplayName}' uploaded.";
+            documentUpload = new UploadDocumentValue();
+            showUploadDocument = false;
+        }
+        else
+        {
+            errorMessage = "Failed to upload document. Please try again.";
         }
     }
 
@@ -521,7 +729,7 @@
     {
         if (documentToDelete is null) return;
 
-        // TODO: wire IDocumentService to client
+        await DocumentService.DeleteDocumentAsync(documentToDelete.Id);
         documents.RemoveAll(d => d.Id == documentToDelete.Id);
         successMessage = $"Document '{documentToDelete.DisplayName}' removed.";
         documentToDelete = null;
@@ -530,6 +738,7 @@
     }
 
     // ---- Helpers ----
+
     private void GoBack()
     {
         if (activity is not null)
@@ -538,12 +747,17 @@
             Navigation.NavigateTo("/admin/modules");
     }
 
-    private static string GetActivityTypeBadge(ActivityType type) => type switch
+    public static class ActivityHelpers
     {
-        ActivityType.Assignment => "bg-warning text-dark",
-        ActivityType.Exercise       => "bg-danger",
-        ActivityType.Lecture    => "bg-primary",
-        ActivityType.ELearning => "bg-success",
-        _                       => "bg-secondary"
-    };
+        public static string GetActivityTypeBadge(string? typeName) => typeName switch
+        {
+            "Assignment" => "bg-warning text-dark",
+            "Exercise" => "bg-danger",
+            "Lecture" => "bg-primary",
+            "E-Learning" => "bg-success",
+            _ => "bg-secondary"
+        };
+    }
+
+
 }

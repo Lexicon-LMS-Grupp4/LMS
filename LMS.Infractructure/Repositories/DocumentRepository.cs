@@ -1,4 +1,4 @@
-﻿using Domain.Contracts.Repositories;
+using Domain.Contracts.Repositories;
 using Domain.Models.Entities;
 using LMS.Infractructure.Data;
 using LMS.Infractructure.Extensions;
@@ -59,6 +59,7 @@ public class DocumentRepository(ApplicationDbContext context) : RepositoryBase<D
     public IQueryable<Document> BuildBasicQuery(bool trackChanges = false)
     {
         return FindAll(trackChanges)
+                .Include(d => d.UploadedByUser)
                 .Include(d => d.Course)
                 .Include(d => d.Module).ThenInclude(m => m.Course)
                 .Include(d => d.Activity).ThenInclude(a => a.Module).ThenInclude(m => m.Course)
@@ -84,6 +85,7 @@ public class DocumentRepository(ApplicationDbContext context) : RepositoryBase<D
     public IQueryable<Document> BuildAccessRelationsQuery(bool trackChanges = false)
     {
         return FindAll(trackChanges)
+                .Include(d => d.UploadedByUser)
                 .Include(d => d.Course).ThenInclude(c => c.CourseTeachers)
                 .Include(d => d.Module).ThenInclude(m => m.Course).ThenInclude(c => c.CourseTeachers)
                 .Include(d => d.Activity).ThenInclude(a => a.Module).ThenInclude(m => m.Course).ThenInclude(c => c.CourseTeachers)
@@ -109,11 +111,40 @@ public class DocumentRepository(ApplicationDbContext context) : RepositoryBase<D
     /// <returns>The filtered query.</returns>
     private static IQueryable<Document> ApplyDocumentFilters(IQueryable<Document> query, DocumentQueryDto dto)
     {
-        return query
-            .WhereIf(dto.CourseId.HasValue, d => d.CourseId == dto.CourseId)
-            .WhereIf(dto.ModuleId.HasValue, d => d.ModuleId == dto.ModuleId)
-            .WhereIf(dto.ActivityId.HasValue, d => d.ActivityId == dto.ActivityId)
-            .WhereIf(dto.SubmissionId.HasValue, d => d.SubmissionId == dto.SubmissionId);
+        var q = query;
+
+        // Apply Layer filtering
+        q = q.WhereIf(!string.IsNullOrEmpty(dto.ScopeTarget) && dto.ScopeTarget == "Course", d => d.CourseId != null && d.ModuleId == null && d.ActivityId == null && d.SubmissionId == null)
+             .WhereIf(!string.IsNullOrEmpty(dto.ScopeTarget) && dto.ScopeTarget == "Module", d => d.ModuleId != null && d.ActivityId == null && d.SubmissionId == null)
+             .WhereIf(!string.IsNullOrEmpty(dto.ScopeTarget) && dto.ScopeTarget == "Activity", d => d.ActivityId != null && d.SubmissionId == null);
+
+        // Apply Parent filtering
+        if (dto.CourseId.HasValue && dto.CourseId.Value > 0)
+        {
+            q = q.Where(d =>
+                d.CourseId == dto.CourseId.Value ||
+                (d.Module != null && d.Module.CourseId == dto.CourseId.Value) ||
+                (d.Activity != null && d.Activity.Module != null && d.Activity.Module.CourseId == dto.CourseId.Value));
+        }
+
+        if (dto.ModuleId.HasValue && dto.ModuleId.Value > 0)
+        {
+            q = q.Where(d =>
+                d.ModuleId == dto.ModuleId.Value ||
+                (d.Activity != null && d.Activity.ModuleId == dto.ModuleId.Value));
+        }
+
+        if (dto.ActivityId.HasValue && dto.ActivityId.Value > 0)
+        {
+            q = q.Where(d => d.ActivityId == dto.ActivityId.Value);
+        }
+
+        if (dto.SubmissionId.HasValue && dto.SubmissionId.Value > 0)
+        {
+            q = q.Where(d => d.SubmissionId == dto.SubmissionId.Value);
+        }
+
+        return q;
     }
 
 }

@@ -1,5 +1,6 @@
-﻿@page "/admin/students"
-@attribute [Authorize(Roles = "Teacher")]
+@page "/admin/users"
+@attribute [Authorize(Roles = "Teacher,Admin")]
+@using LMS.Blazor.Client.Components
 @using LMS.Shared.DTOs.Course
 @using LMS.Shared.DTOs.User
 @inject IUserService UserService
@@ -11,8 +12,14 @@
 <div class="container-fluid py-4">
 
     @* ── Header ── *@
-    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
         <h2 class="mb-0">User Management</h2>
+        @if (!showForm)
+        {
+            <button class="btn btn-primary" @onclick="HandleCreateClicked">
+                <i class="bi bi-plus-lg me-1"></i> Create User
+            </button>
+        }
     </div>
 
     @* ── Feedback ── *@
@@ -29,6 +36,15 @@
             @errorMessage
             <button type="button" class="btn-close" @onclick="() => errorMessage = null"></button>
         </div>
+    }
+
+    @* ---- Form section ---- *@
+    @if (showForm)
+    {
+        <UserFormComponent
+            User="selectedUser"
+            OnSubmit="HandleFormSubmit"
+            OnCancel="HandleFormCancel" />
     }
 
     @* ── Tab bar ── *@
@@ -98,7 +114,7 @@
     {
         var visible = FilteredList;
 
-        @if (!visible.Any())
+        @if (!visible.Any() && isLoading)
         {
             <div class="alert alert-info">
                 @if (activeTab == TabKey.ByCourse && selectedCourseId == 0)
@@ -125,7 +141,7 @@
                                     {
                                         <th class="d-none d-md-table-cell">Course</th>
                                     }
-                                    <th style="width:100px;"></th>
+                                    <th></th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -157,12 +173,39 @@
                                                 @if ((activeTab == TabKey.AllStudents || activeTab == TabKey.ByCourse)
                                                       && user.CourseId is not null)
                                                 {
-                                                    <button class="btn btn-sm btn-outline-warning"
-                                                            title="Remove from course"
-                                                            @onclick="() => RemoveFromCourseAsync(user)">
-                                                        <i class="bi bi-person-dash"></i>
-                                                    </button>
+                                                    @if (pendingUnenrollId == user.Id)
+                                                    {
+                                                        <button class="btn btn-sm btn-outline-warning"
+                                                                title="Confirm remove"
+                                                                @onclick="() => RemoveFromCourseAsync(user)">
+                                                            <i class="bi bi-check-lg"></i> Sure?
+                                                        </button>
+                                                        <button class="btn btn-sm btn-secondary"
+                                                                @onclick="() => pendingUnenrollId = null">
+                                                            <i class="bi bi-x"></i>
+                                                        </button>
+                                                    }
+                                                    else
+                                                    {
+                                                        @* <button class="btn btn-sm btn-outline-warning"
+                                                                title="Remove from course"
+                                                                @onclick="() => RemoveFromCourseAsync(user)">
+                                                            <i class="bi bi-person-dash"></i>
+                                                        </button> *@
+                                                        <button class="btn btn-sm btn-outline-warning"
+                                                                title="Unenroll user"
+                                                                @onclick="() => pendingUnenrollId = user.Id">
+                                                            <i class="bi bi-person-dash"></i>
+                                                        </button>
+                                                    }
                                                 }
+
+                                                @* Edit button  *@
+                                                <button class="btn btn-sm btn-outline-primary"
+                                                        @onclick="() => HandleEditClicked(user)">
+                                                    <i class="bi bi-pencil"></i>
+                                                </button>
+
                                                 @* Delete button *@
                                                 @if (pendingDeleteId == user.Id)
                                                 {
@@ -241,6 +284,37 @@
     private string? successMessage;
     private string? errorMessage;
     private string? pendingDeleteId;
+    private string? pendingUnenrollId;
+
+    private bool showForm;
+    private UserDto? selectedUser;
+
+    private void HandleCreateClicked()
+    {
+        selectedUser = null;
+        showForm = true;
+    }
+
+    private void HandleEditClicked(UserDto user)
+    {
+        selectedUser = user;
+        showForm = true;
+    }
+
+    private async Task HandleFormSubmit(UserDto result)
+    {
+        showForm = false;
+        selectedUser = null;
+        await LoadCurrentTabAsync();
+        successMessage = $"User '{result.Name}' saved successfully.";
+    }
+
+    private void HandleFormCancel()
+    {
+        showForm = false;
+        selectedUser = null;
+    }
+
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -281,6 +355,7 @@
 
     protected override async Task OnInitializedAsync()
     {
+        isLoading = true;
         await LoadCoursesAsync();
         await LoadCurrentTabAsync();
     }
@@ -292,6 +367,7 @@
         activeTab = tab;
         searchQuery = string.Empty;
         pendingDeleteId = null;
+        pendingUnenrollId = null;
         await LoadCurrentTabAsync();
     }
 
@@ -381,6 +457,8 @@
 
     private async Task RemoveFromCourseAsync(UserDto user)
     {
+        pendingDeleteId = null;
+        pendingUnenrollId = null;
         errorMessage = null;
         successMessage = null;
 
@@ -400,6 +478,7 @@
     private async Task ConfirmDeleteAsync(string userId)
     {
         pendingDeleteId = null;
+        pendingUnenrollId = null;
         errorMessage = null;
         successMessage = null;
 

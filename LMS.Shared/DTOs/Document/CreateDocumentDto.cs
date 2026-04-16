@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Http;
+using System.ComponentModel.DataAnnotations;
 
 namespace LMS.Shared.DTOs.Document
 {
@@ -7,8 +8,9 @@ namespace LMS.Shared.DTOs.Document
     /// Used in POST /api/documents requests.
     /// Must specify exactly one of CourseId, ModuleId, or ActivityId.
     /// </summary>
-    public record CreateDocumentDto
+    public class CreateDocumentDto
     {
+        [MaxLength(150, ErrorMessage = "Description max length is 150 characters")]
         public string Description { get; init; } = string.Empty;
         public IFormFile File { get; init; } = null!;
         public int? CourseId { get; init; }

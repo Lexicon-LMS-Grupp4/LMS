@@ -11,7 +11,7 @@
                         OnCycleGradient="OnCycleGradient"
                         OnEdit="OnEdit"
                         OnDelete="OnDelete"
-                        OnViewActivities="OnViewActivities" />
+                        OnGoToModule="OnGoToModule" />
         </div>
     }
 </div>
@@ -23,7 +23,7 @@
     [Parameter] public EventCallback<int> OnCycleGradient { get; set; }
     [Parameter] public EventCallback<ModuleDto> OnEdit { get; set; }
     [Parameter] public EventCallback<int> OnDelete { get; set; }
-    [Parameter] public EventCallback<int> OnViewActivities { get; set; }
+    [Parameter] public EventCallback<int> OnGoToModule { get; set; }
 
     private string GetGradient(int id) =>
         ModuleStyles.Gradients[GradientIndex.GetValueOrDefault(id, id % ModuleStyles.Gradients.Length)];

@@ -1,4 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using LMS.Shared.Request;
+using Microsoft.EntityFrameworkCore;
 using System.Linq.Expressions;
 
 namespace LMS.Infractructure.Extensions;
@@ -27,6 +28,19 @@ public static class QueryableExtensions
         var items = await query
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
+            .ToListAsync();
+
+        return (items, totalCount);
+    }
+    public static async Task<(IEnumerable<T> items, int totalCount)> PagedResult<T>(
+        this IQueryable<T> query,
+        PagedRequestParams queryParams)
+    {
+        var totalCount = await query.CountAsync();
+
+        var items = await query
+            .Skip((queryParams.Page - 1) * queryParams.PageSize)
+            .Take(queryParams.PageSize)
             .ToListAsync();
 
         return (items, totalCount);

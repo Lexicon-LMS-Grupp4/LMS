@@ -1,4 +1,4 @@
-﻿using Domain.Contracts.Repositories;
+using Domain.Contracts.Repositories;
 using Domain.Models.Entities;
 using LMS.Infractructure.Data;
 using LMS.Infractructure.Extensions;
@@ -15,21 +15,26 @@ public class CourseRepository : RepositoryBase<Course>, ICourseRepository
     public async Task<(IEnumerable<Course> Courses, int TotalCount)> GetAllCoursesAsync(
         int page, int pageSize, bool trackChanges = false)
     {
-        var query = FindAll(trackChanges)
-            .Include(c => c.Students)
-            .Include(c => c.Modules)
-            .Include(c => c.CourseTeachers);
+        var query = BuildQuery(trackChanges);
 
         return await query.PagedResult(page, pageSize);
     }
 
-    public async Task<Course?> GetCourseAsync(int id, bool trackChanges = false)
+    public IQueryable<Course> BuildQuery(bool trackChanges = false)
     {
-        return await FindByCondition(c => c.Id == id, trackChanges)
+        return FindAll(trackChanges)
             .Include(c => c.Students)
             .Include(c => c.Modules)
                 .ThenInclude(m => m.Activities)
             .Include(c => c.CourseTeachers)
-            .FirstOrDefaultAsync();
+            .Include(c => c.Documents)
+                .ThenInclude(d => d.UploadedByUser);
+    }
+
+    public async Task<Course?> GetCourseAsync(int id, bool trackChanges = false)
+    {
+        return await BuildQuery(trackChanges)
+            .FirstOrDefaultAsync(c => c.Id == id);
+
     }
 }

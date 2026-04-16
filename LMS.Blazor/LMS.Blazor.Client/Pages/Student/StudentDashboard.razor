@@ -1,23 +1,25 @@
-﻿@page "/student/dashboard"
+@page "/student/overview"
 @attribute [Authorize(Roles = "Student")]
+@using Domain.Models.Entities
+@using LMS.Blazor.Client.Components
+@using LMS.Blazor.Client.Components.User
 @using LMS.Shared.DTOs.Activity
 @using LMS.Shared.DTOs.Course
 @using LMS.Shared.DTOs.Module
 @using LMS.Shared.DTOs.User
-@using Domain.Models.Enums
 @inject ICourseService CourseService
 @inject IModuleService ModuleService
 @inject IActivityService ActivityService
 @inject NavigationManager Navigation
 
-<PageTitle>My Dashboard</PageTitle>
+<PageTitle>Course Overview</PageTitle>
 
 <div class="container-fluid py-4">
 
     @* ---- Header ---- *@
     <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
         <div>
-            <h2 class="mb-0">My Dashboard</h2>
+            <h2 class="mb-2">Course Overview</h2>
             <p class="text-muted small mb-0">Welcome back! Here's what's happening in your course.</p>
         </div>
     </div>
@@ -81,7 +83,7 @@
                 <div class="card text-center h-100 border-warning border-opacity-25">
                     <div class="card-body py-3">
                         <div class="fs-2 fw-bold text-warning">
-                            @allActivities.Count(a => a.Type == ActivityType.Assignment)
+                            @allActivities.Count(a => a.ActivityTypeName == "Assignment")
                         </div>
                         <div class="text-muted small">Assignments</div>
                     </div>
@@ -93,6 +95,18 @@
                         <div class="fs-2 fw-bold text-danger">@upcomingDeadlines.Count</div>
                         <div class="text-muted small">Upcoming Deadlines</div>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-lightning-charge me-2"></i>Quick links</h6>
+            </div>
+            <div class="card-body">
+                <div class="d-flex flex-wrap gap-2">
+                    <a class="btn btn-outline-primary btn-sm" href="@($"/courses/{course.Id}")">Module overview</a>
+                    <a class="btn btn-outline-primary btn-sm" href="/student/documents">Documents</a>
                 </div>
             </div>
         </div>
@@ -136,9 +150,9 @@
                         {
                             @foreach (var module in modules)
                             {
-                                var isActive = module.StartDate <= DateTime.Now &&
-                                               (module.EndDate == null || module.EndDate >= DateTime.Now);
-                                var isPast   = module.EndDate < DateTime.Now;
+                                var now = DateTime.Now;
+                                var isPast = module.EndDate < now;
+                                var isActive = !isPast && module.StartDate <= now;
 
                                 <div class="border-bottom">
                                     @* Module header row *@
@@ -200,7 +214,7 @@
                                                                     <div>
                                                                         <div class="d-flex align-items-center gap-2 flex-wrap">
                                                                             <span class="fw-semibold small">@act.Name</span>
-                                                                            <span class="badge @GetActivityTypeBadge(act.Type) badge-sm">@act.Type</span>
+                                                                            <span class="badge @GetActivityTypeBadge(act.ActivityTypeName) badge-sm">@act.ActivityTypeName</span>
                                                                             @if (isOverdue)
                                                                             {
                                                                                 <span class="badge bg-danger badge-sm">Past</span>
@@ -212,14 +226,14 @@
                                                                         }
                                                                         <div class="text-muted small mt-1">
                                                                             <i class="bi bi-clock me-1"></i>
-                                                                            @act.StartTime.ToString("MMM d, HH:mm")
+                                                                            @act.StartTime.ToString()
                                                                             <span class="mx-1">–</span>
                                                                             <span class="@(isOverdue ? "text-danger" : "")">
                                                                                 @act.EndTime.ToString("MMM d, HH:mm")
                                                                             </span>
                                                                         </div>
                                                                     </div>
-                                                                    @if (act.Type == ActivityType.Assignment)
+                                                                    @if (act.ActivityTypeName == "Assignment")
                                                                     {
                                                                         <button class="btn btn-sm @(isOverdue ? "btn-outline-secondary" : "btn-outline-primary") flex-shrink-0"
                                                                             @onclick="() => Navigation.NavigateTo(GetDetailsUrl(act.Id))">
@@ -296,53 +310,12 @@
                 </div>
 
                 @* ---- Classmates ---- *@
-                <div class="card mb-4">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <h6 class="mb-0"><i class="bi bi-people me-2"></i>Classmates</h6>
-                        <span class="badge bg-secondary">@classmates.Count</span>
-                    </div>
-                    <div class="card-body p-0">
-                        @if (isLoadingClassmates)
-                        {
-                            <div class="text-center py-3">
-                                <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
-                            </div>
-                        }
-                        else if (!classmates.Any())
-                        {
-                            <p class="text-muted p-3 mb-0">No other students enrolled yet.</p>
-                        }
-                        else
-                        {
-                            <ul class="list-group list-group-flush">
-                                @foreach (var mate in classmates.Take(10))
-                                {
-                                    <li class="list-group-item px-3 py-2">
-                                        <div class="d-flex align-items-center gap-2">
-                                            <div class="rounded-circle bg-primary bg-opacity-10 text-primary d-flex align-items-center justify-content-center flex-shrink-0"
-                                                 style="width:32px;height:32px;font-size:0.8rem;font-weight:600;">
-                                                @(mate.Name.Length > 0 ? mate.Name[0].ToString().ToUpper() : "?")
-                                            </div>
-                                            <div class="overflow-hidden">
-                                                <div class="small fw-semibold text-truncate">@mate.Name</div>
-                                                <div class="small text-muted text-truncate">@mate.Email</div>
-                                            </div>
-                                        </div>
-                                    </li>
-                                }
-                                @if (classmates.Count > 10)
-                                {
-                                    <li class="list-group-item px-3 py-2 text-muted small text-center">
-                                        + @(classmates.Count - 10) more students
-                                    </li>
-                                }
-                            </ul>
-                        }
-                    </div>
+                <ClassmateList CourseId="@course!.Id" Role="Teacher" Class="mb-4" />
+                <ClassmateList CourseId="@course!.Id" Class="mb-4" />
                 </div>
-
-            </div>
         </div>
+
+        <CourseDocumentTable CourseId="@course.Id" />
     }
 </div>
 
@@ -352,12 +325,10 @@
     private List<ModuleDto> modules = [];
     private List<ActivityDto> allActivities = [];
     private List<ActivityDto> upcomingDeadlines = [];
-    private List<StudentDto> classmates = [];
     private Dictionary<int, List<ActivityDto>> moduleActivities = new();
 
     // ---- Page state ----
     private bool isLoading;
-    private bool isLoadingClassmates;
     private int? loadingActivitiesForModule;
     private string? loadError;
     private string? errorMessage;
@@ -375,34 +346,28 @@
 
         try
         {
-            // TODO: replace with GET /api/studentcourse/mycourse (needs auth token forwarding).
-            // For now we load the first available course as a stand-in.
-            var coursePage = await CourseService.GetAllCoursesAsync(1, 1);
-            if (coursePage?.Items.FirstOrDefault() is CourseDto first)
+            var myCourse = await CourseService.GetMyCourseAsync();
+            if (myCourse is not null)
             {
-                var detail = await CourseService.GetCourseDetailByIdAsync(first.Id);
+                var detail = await CourseService.GetCourseDetailByIdAsync(myCourse.Id);
                 if (detail is not null)
                 {
-                    course  = detail;
+                    course = detail;
                     modules = detail.Modules;
                 }
             }
 
             if (course is not null)
             {
-                // Load all activities for deadline calculation
-                var actPage = await ActivityService.GetAllActivitiesAsync(pageSize: 100);
-                allActivities = actPage?.Items ?? [];
+                var moduleIds = modules.Select(m => m.Id).ToHashSet();
+                allActivities = await LoadActivitiesForCourseModulesAsync(moduleIds);
 
                 upcomingDeadlines = allActivities
-                    .Where(a => a.Type == ActivityType.Assignment
+                    .Where(a => a.ActivityTypeName == "Assignment"
                              && a.EndTime >= DateTime.Now
                              && a.EndTime <= DateTime.Now.AddDays(7))
                     .OrderBy(a => a.EndTime)
                     .ToList();
-
-                // Load classmates in parallel
-                _ = LoadClassmatesAsync(course.Id);
             }
         }
         catch (Exception ex)
@@ -415,27 +380,28 @@
         }
     }
 
-    private async Task LoadClassmatesAsync(int courseId)
+    private async Task<List<ActivityDto>> LoadActivitiesForCourseModulesAsync(HashSet<int> moduleIds)
     {
-        isLoadingClassmates = true;
-        StateHasChanged();
+        if (moduleIds.Count == 0)
+            return [];
 
-        try
+        const int pageSize = 100;
+        var collected = new List<ActivityDto>();
+        var page = 1;
+        while (true)
         {
-            // TODO: wire GET /api/studentcourse/classmates through IStudentCourseService client
-            // For now classmates list stays empty until that service is added
-            classmates = [];
-            await Task.CompletedTask;
+            var actPage = await ActivityService.GetAllActivitiesAsync(page, pageSize);
+            if (actPage?.Items is null || actPage.Items.Count == 0)
+                break;
+
+            collected.AddRange(actPage.Items.Where(a => moduleIds.Contains(a.ModuleId)));
+
+            if (!actPage.HasNextPage)
+                break;
+            page++;
         }
-        catch
-        {
-            classmates = [];
-        }
-        finally
-        {
-            isLoadingClassmates = false;
-            StateHasChanged();
-        }
+
+        return collected;
     }
 
     // ---- Module expand / lazy-load activities ----
@@ -471,13 +437,13 @@
     }
 
     // ---- Helpers ----
-    private static string GetActivityTypeBadge(ActivityType type) => type switch
+    private static string GetActivityTypeBadge(string typeName) => typeName switch
     {
-        ActivityType.Assignment => "bg-warning text-dark",
-        ActivityType.Exercise       => "bg-danger",
-        ActivityType.Lecture    => "bg-primary",
-        ActivityType.ELearning => "bg-success",
-        _                       => "bg-secondary"
+        "Assignment" => "bg-warning text-dark",
+        "Exercise" => "bg-danger",
+        "Lecture" => "bg-primary",
+        "E-Learning" => "bg-success",
+        _ => "bg-secondary"
     };
 
     private string GetDetailsUrl(int id)

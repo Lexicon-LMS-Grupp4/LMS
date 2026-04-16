@@ -30,6 +30,9 @@ namespace LMS.Infractructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<int>("ActivityTypeId")
+                        .HasColumnType("int");
+
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasMaxLength(2000)
@@ -49,14 +52,39 @@ namespace LMS.Infractructure.Migrations
                     b.Property<DateTime?>("StartTime")
                         .HasColumnType("datetime2");
 
-                    b.Property<int>("Type")
-                        .HasColumnType("int");
-
                     b.HasKey("Id");
+
+                    b.HasIndex("ActivityTypeId");
 
                     b.HasIndex("ModuleId");
 
                     b.ToTable("Activities");
+                });
+
+            modelBuilder.Entity("Domain.Models.Entities.ActivityType", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("ActivityTypes");
                 });
 
             modelBuilder.Entity("Domain.Models.Entities.ApplicationUser", b =>
@@ -244,7 +272,7 @@ namespace LMS.Infractructure.Migrations
 
                     b.ToTable("Documents", t =>
                         {
-                            t.HasCheckConstraint("CK_Document_ExactlyOneOwner", "(\r\n    CASE WHEN CourseId IS NOT NULL THEN 1 ELSE 0 END +\r\n    CASE WHEN ModuleId IS NOT NULL THEN 1 ELSE 0 END +\r\n    CASE WHEN ActivityId IS NOT NULL THEN 1 ELSE 0 END +\r\n    CASE WHEN SubmissionId IS NOT NULL THEN 1 ELSE 0 END\r\n) = 1");
+                            t.HasCheckConstraint("CK_Document_AtMostOneOwner", "(\r\n    CASE WHEN CourseId IS NOT NULL THEN 1 ELSE 0 END +\r\n    CASE WHEN ModuleId IS NOT NULL THEN 1 ELSE 0 END +\r\n    CASE WHEN ActivityId IS NOT NULL THEN 1 ELSE 0 END +\r\n    CASE WHEN SubmissionId IS NOT NULL THEN 1 ELSE 0 END\r\n) <= 1");
                         });
                 });
 
@@ -486,11 +514,19 @@ namespace LMS.Infractructure.Migrations
 
             modelBuilder.Entity("Domain.Models.Entities.Activity", b =>
                 {
+                    b.HasOne("Domain.Models.Entities.ActivityType", "ActivityType")
+                        .WithMany("Activities")
+                        .HasForeignKey("ActivityTypeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("Domain.Models.Entities.Module", "Module")
                         .WithMany("Activities")
                         .HasForeignKey("ModuleId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("ActivityType");
 
                     b.Navigation("Module");
                 });
@@ -668,6 +704,11 @@ namespace LMS.Infractructure.Migrations
                     b.Navigation("Documents");
 
                     b.Navigation("Submissions");
+                });
+
+            modelBuilder.Entity("Domain.Models.Entities.ActivityType", b =>
+                {
+                    b.Navigation("Activities");
                 });
 
             modelBuilder.Entity("Domain.Models.Entities.ApplicationUser", b =>

@@ -1,8 +1,11 @@
+using Domain.Contracts.Storage;
 using LMS.API.DependencyInjection;
 using LMS.Infractructure.Data;
 using LMS.Infractructure.Repositories;
+using LMS.Infrastructure.Storage;
 using LMS.Presentation;
 using LMS.Services;
+using LMS.Services.Access;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi;
@@ -90,6 +93,7 @@ public static class ServiceExtensions
 
         services.AddScoped<ICourseRepository, CourseRepository>();
         services.AddScoped<IModuleRepository, ModuleRepository>();
+        services.AddScoped<IActivityTypeRepository, ActivityTypeRepository>();
         services.AddScoped<IActivityRepository, ActivityRepository>();
         services.AddScoped<IDocumentRepository, DocumentRepository>();
         services.AddScoped<ISubmissionRepository, SubmissionRepository>();
@@ -102,6 +106,7 @@ public static class ServiceExtensions
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<ICourseService, CourseService>();
         services.AddScoped<IModuleService, ModuleService>();
+        services.AddScoped<IActivityTypeService, ActivityTypeService>();
         services.AddScoped<IActivityService, ActivityService>();
         services.AddScoped<IDocumentService, DocumentService>();
         services.AddScoped<ISubmissionService, SubmissionService>();
@@ -111,5 +116,12 @@ public static class ServiceExtensions
         services.AddScoped(provider => new Lazy<IUserService>(() => provider.GetRequiredService<IUserService>()));
 
         services.AddScoped<IStudentCourseService, StudentCourseService>();
+
+        services.AddScoped<ILmsAccessService, LmsAccessService>();
+        services.AddScoped<ILmsRelationResolver, LmsRelationResolver>();
+        services.AddScoped<IUserAccessContext, UserAccessContext>();
+        services.AddScoped<IUserAccessContextFactory, UserAccessContextFactory>();
+
+        services.AddScoped<IDocumentManager, DocumentManager>();
     }
 }

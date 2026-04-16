@@ -29,4 +29,6 @@ public record CourseDto
     /// </summary>
     public required int ModuleCount { get; init; }
 
+    public bool CurrentUserHasAccess { get; init; }
+
 }

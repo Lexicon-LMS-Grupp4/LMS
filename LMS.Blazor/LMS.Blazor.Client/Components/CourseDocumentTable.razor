@@ -1,0 +1,111 @@
+﻿@using LMS.Shared.DTOs.Document
+@inject IDocumentService DocumentService
+
+@if (isLoading)
+{
+    <div class="text-center py-3">
+        <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+        <span class="ms-2 text-muted small">Loading documents...</span>
+    </div>
+}
+else if (!documents.Any())
+{
+    <div class="text-center py-4 text-muted small">
+        <i class="bi bi-inbox fs-4 opacity-50 d-block mb-1"></i>
+        No documents attached to this course.
+    </div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0 small">
+            <thead class="table-light text-muted text-uppercase" style="font-size: 0.7rem; letter-spacing: 0.05em;">
+                <tr>
+                    <th class="ps-3">Name</th>
+                    <th>Size</th>
+                    <th>Uploaded by</th>
+                    <th>Date</th>
+                    <th class="text-end pe-3"></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var doc in documents)
+                {
+                    <tr>
+                        <td class="ps-3">
+                            <div class="d-flex align-items-center gap-2">
+                                <i class="@GetIcon(doc.ContentType) text-primary" style="font-size: 1.1rem; width: 20px;"></i>
+                                <div>
+                                    <div class="fw-semibold text-dark">@doc.DisplayName</div>
+                                    @if (!string.IsNullOrWhiteSpace(doc.Description))
+                                    {
+                                        <div class="text-muted" style="font-size: 0.75rem;">@doc.Description</div>
+                                    }
+                                </div>
+                            </div>
+                        </td>
+                        <td class="text-muted">@FormatSize(doc.FileSize)</td>
+                        <td class="text-muted">@doc.UploadedByUserName</td>
+                        <td class="text-muted">@doc.UploadedAt.ToLocalTime().ToString("MMM dd, yyyy")</td>
+                        <td class="text-end pe-3">
+                            <a href="@DocumentService.GetDocumentFileUrl(doc.Id, true)"
+                                   class="btn btn-sm btn-outline-secondary"
+                                   title="Download"
+                                   target="_blank">
+                                <i class="bi bi-download"></i>
+                            </a>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public int CourseId { get; set; }
+
+    private List<DocumentDto> documents = new();
+    private bool isLoading = true;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (CourseId <= 0) return;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        isLoading = true;
+        var query = new DocumentQueryDto
+        {
+            ScopeTarget = "Course",
+            CourseId = CourseId
+        };
+        var result = await DocumentService.GetAllDocumentsAsync(1, 100, query);
+        documents = result?.Items ?? new();
+        isLoading = false;
+    }
+
+    private static string GetIcon(string contentType) => contentType.ToLower() switch
+    {
+        var ct when ct.Contains("pdf") => "bi bi-file-pdf",
+        var ct when ct.Contains("word")
+                 || ct.Contains("officedocument.word") => "bi bi-file-word",
+        var ct when ct.Contains("excel")
+                 || ct.Contains("officedocument.sheet") => "bi bi-file-excel",
+        var ct when ct.Contains("powerpoint")
+                 || ct.Contains("officedocument.presentation") => "bi bi-file-ppt",
+        var ct when ct.Contains("image") => "bi bi-file-image",
+        _ => "bi bi-file-earmark-text"
+    };
+
+    private static string FormatSize(long bytes)
+    {
+        string[] suffixes = { "B", "KB", "MB", "GB" };
+        int i = 0;
+        double size = bytes;
+        while (i < suffixes.Length - 1 && size >= 1024) { i++; size /= 1024; }
+        return $"{size:n1} {suffixes[i]}";
+    }
+}

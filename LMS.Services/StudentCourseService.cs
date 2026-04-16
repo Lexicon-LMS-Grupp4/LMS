@@ -32,7 +32,7 @@ public class StudentCourseService : IStudentCourseService
         if (user.CourseId is not int courseId)
             return null;
 
-        return await courseService.GetCourseByIdAsync(courseId);
+        return await courseService.GetCourseByIdAsync(courseId, userId);
     }
 
     public async Task<IReadOnlyList<StudentDto>> GetCourseClassmatesAsync(int courseId, string excludeUserId)

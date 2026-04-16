@@ -1,4 +1,4 @@
-﻿namespace LMS.Shared.DTOs.Document;
+namespace LMS.Shared.DTOs.Document;
 
 public record DocumentQueryDto
 {
@@ -6,4 +6,5 @@ public record DocumentQueryDto
     public int? ModuleId { get; init; }
     public int? ActivityId { get; init; }
     public int? SubmissionId { get; init; }
+    public string? ScopeTarget { get; init; }
 }

@@ -1,0 +1,154 @@
+﻿
+@using LMS.Blazor.Client.Uploads
+
+<div class="mb-3">
+    @if (!string.IsNullOrWhiteSpace(Label))
+    {
+        <label class="form-label fw-semibold">@Label</label>
+    }
+
+    <BbFileUpload Files="files"
+                  FilesChanged="OnFilesChanged"
+                  MaxFileCount="1"
+                  ShowPreview="false"
+                  Accept="@Accept"
+                  Disabled="@Disabled" />
+
+    @if (!string.IsNullOrWhiteSpace(FileHelpText))
+    {
+        <div class="form-text">@FileHelpText</div>
+    }
+
+    @if (Value?.HasExistingDocument == true && Value.HasFile == false && !Value.RemoveExistingDocument)
+    {
+        <div class="text-muted small mt-2">
+            Current file: @Value.ExistingFileName
+        </div>
+    }
+
+    @if (Value?.HasFile == true && ShowFileName)
+    {
+        <div class="text-muted small mt-2">
+            Selected file: @Value.File?.Name
+        </div>
+    }
+
+    @if (AllowRemoveExistingDocument && Value?.HasExistingDocument == true && !Value.HasFile)
+    {
+        <div class="form-check mt-2">
+            <InputCheckbox class="form-check-input"
+                           Value="CurrentRemoveExistingDocument"
+                           ValueChanged="OnRemoveExistingDocumentChanged"
+                           ValueExpression="() => CurrentRemoveExistingDocument"
+                           disabled="@Disabled" />
+            <label class="form-check-label">
+                Remove current file
+            </label>
+        </div>
+    }
+</div>
+
+<div class="mb-3">
+    <label class="form-label">@DescriptionLabel</label>
+    <InputText class="form-control"
+               Value="@CurrentDescription"
+               ValueChanged="OnDescriptionChanged"
+               ValueExpression="() => CurrentDescription"
+               placeholder="@DescriptionPlaceholder"
+               disabled="@Disabled" />
+</div>
+
+@if (HandleSubmit.HasDelegate)
+{
+    <div class="mb-3">
+        <button type="button"
+                class="btn btn-primary"
+                @onclick="OnSubmitClicked"
+                disabled="@Disabled">
+            Save
+        </button>
+    </div>
+}
+
+@code {
+    private IReadOnlyList<FileUploadItem>? files;
+
+    [Parameter]
+    public UploadDocumentValue? Value { get; set; }
+
+    [Parameter]
+    public EventCallback<UploadDocumentValue?> ValueChanged { get; set; }
+
+    [Parameter] public string? Label { get; set; } = "File";
+    [Parameter] public string DescriptionLabel { get; set; } = "File Description";
+    [Parameter] public string DescriptionPlaceholder { get; set; } = "Describe the file";
+    [Parameter] public string? FileHelpText { get; set; } = "You can upload one file.";
+    [Parameter] public string Accept { get; set; } = ".pdf,.doc,.docx,.png,.jpg,.jpeg";
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public bool ShowFileName { get; set; } = true;
+    [Parameter] public bool AllowRemoveExistingDocument { get; set; } = true;
+
+
+    [Parameter] public EventCallback HandleSubmit { get; set; }
+
+    private string CurrentDescription => Value?.Description ?? string.Empty;
+    private bool CurrentRemoveExistingDocument => Value?.RemoveExistingDocument ?? false;
+
+    protected override void OnParametersSet()
+    {
+
+        if (Value?.File is not null)
+        {
+            files = new List<FileUploadItem> { Value.File };
+        }
+        else
+        {
+            files = null;
+        }
+    }
+
+    private async Task OnFilesChanged(IReadOnlyList<FileUploadItem>? newFiles)
+    {
+        files = newFiles;
+
+        var current = Value ?? new UploadDocumentValue();
+        current.File = newFiles?.FirstOrDefault();
+
+        if (current.File is not null)
+        {
+            current.RemoveExistingDocument = false;
+        }
+
+        await ValueChanged.InvokeAsync(current);
+    }
+
+    private async Task OnDescriptionChanged(string newValue)
+    {
+        var current = Value ?? new UploadDocumentValue();
+        current.Description = newValue;
+
+        await ValueChanged.InvokeAsync(current);
+    }
+
+    private async Task OnRemoveExistingDocumentChanged(bool remove)
+    {
+        var current = Value ?? new UploadDocumentValue();
+        current.RemoveExistingDocument = remove;
+
+        if (remove)
+        {
+            current.File = null;
+            files = null;
+        }
+
+        await ValueChanged.InvokeAsync(current);
+    }
+
+    private async Task OnSubmitClicked()
+    {
+        if (HandleSubmit.HasDelegate)
+        {
+            await HandleSubmit.InvokeAsync();
+        }
+    }
+}

@@ -1,6 +1,9 @@
 @implements IDisposable
 @inject NavigationManager NavigationManager
 @using Microsoft.AspNetCore.Components.Authorization
+@using LMS.Shared.DTOs.Course
+@inject IEnumerable<LMS.Blazor.Client.Services.IApiService> ApiServices
+@inject AuthenticationStateProvider AuthStateProvider
 
 <div class="top-row ps-3 navbar navbar-dark">
     <div class="container-fluid">
@@ -47,7 +50,7 @@
                     <div class="nav-section-title">teacher</div>
 
                     <div class="nav-item">
-                        <NavLink class="nav-link" href="/admin">
+                        <NavLink class="nav-link" href="/admin" Match="NavLinkMatch.All">
                             <span class="bi bi-grid-nav-menu" aria-hidden="true"></span>
                             Dashboard
                         </NavLink>
@@ -59,23 +62,11 @@
                             Courses
                         </NavLink>
                     </div>
-                    <div class="nav-item ">
-                        <NavLink class="nav-link" href="modules">
-                            <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Modules
-                        </NavLink>
-                    </div>
-
-                    <div class="nav-item">
-                        <NavLink class="nav-link" href="/admin/modules">
-                            <span class="bi bi-folder-nav-menu" aria-hidden="true"></span>
-                            Modules
-                        </NavLink>
-                    </div>
 
                     <div class="nav-item ">
-                        <NavLink class="nav-link" href="/admin/activities">
-                            <span class="bi bi-calendar-nav-menu" aria-hidden="true"></span>
-                            Activities
+                        <NavLink class="nav-link" href="/admin/users">
+                            <span class="bi bi-people-nav-menu" aria-hidden="true"></span>
+                            Users
                         </NavLink>
                     </div>
 
@@ -83,20 +74,6 @@
                         <NavLink class="nav-link" href="/admin/documents">
                             <span class="bi bi-file-earmark-nav-menu" aria-hidden="true"></span>
                             Documents
-                        </NavLink>
-                    </div>
-                    
-                    <div class="nav-item ">
-                        <NavLink class="nav-link" href="/admin/students">
-                            <span class="bi bi-people-nav-menu" aria-hidden="true"></span>
-                            Students
-                        </NavLink>
-                    </div>
-
-                    <div class="nav-item ">
-                        <NavLink class="nav-link" href="/admin/users">
-                            <span class="bi bi-people-nav-menu" aria-hidden="true"></span>
-                            Users
                         </NavLink>
                     </div>
                 </div>
@@ -114,7 +91,6 @@
                     <div class="nav-item">
                         <form action="Account/Logout" method="post">
                             <AntiforgeryToken />
-                            <input type="hidden" name="ReturnUrl" value="@currentUrl" />
                             <button type="submit" class="nav-link">
                                 <span class="bi bi-arrow-bar-left-nav-menu" aria-hidden="true"></span> Logout
                             </button>
@@ -130,25 +106,19 @@
                     <div class="nav-section-title">Student</div>
 
                     <div class="nav-item ">
-                                    <NavLink class="nav-link" href="/student/dashboard">
+                                    <NavLink class="nav-link" href="/student/overview">
                             <span class="bi bi-grid-nav-menu" aria-hidden="true"></span>
-                            Dashboard
+                            Overview
                         </NavLink>
                     </div>
 
                     <div class="nav-item ">
-                        <NavLink class="nav-link" href="/modules">
+                        <NavLink class="nav-link" href="@(studentCourseId > 0 ? $"/courses/{studentCourseId}" : "/courses/1")">
                             <span class="bi bi-folder-nav-menu" aria-hidden="true"></span>
-                            My Course
+                            @(string.IsNullOrEmpty(studentCourseName) ? "My Course" : studentCourseName)
                         </NavLink>
                     </div>
 
-                    <div class="nav-item ">
-                        <NavLink class="nav-link" href="/student/activities">
-                            <span class="bi bi-calendar-nav-menu" aria-hidden="true"></span>
-                            My Activities
-                        </NavLink>
-                    </div>
 
                     <div class="nav-item ">
                         <NavLink class="nav-link" href="/student/documents">
@@ -171,7 +141,6 @@
 
                         <form action="Account/Logout" method="post">
                             <AntiforgeryToken />
-                            <input type="hidden" name="ReturnUrl" value="@currentUrl" />
                             <button type="submit" class="nav-link">
                                 <span class="bi bi-arrow-bar-left-nav-menu" aria-hidden="true"></span> Logout
                             </button>
@@ -186,11 +155,35 @@
 
 @code {
     private string? currentUrl;
+    private string? studentCourseName;
+    private int studentCourseId;
+    private LMS.Blazor.Client.Services.IApiService? ApiService => ApiServices.FirstOrDefault();
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
         currentUrl = NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
         NavigationManager.LocationChanged += OnLocationChanged;
+
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        if (authState.User.IsInRole("Student"))
+        {
+            try
+            {
+                if (ApiService != null)
+                {
+                    var course = await ApiService.GetAsync<CourseDto>("api/studentcourse/mycourse");
+                    if (course != null)
+                    {
+                        studentCourseName = course.Name;
+                        studentCourseId = course.Id;
+                    }
+                }
+            }
+            catch
+            {
+                // Fallback to defaults if API fails
+            }
+        }
     }
 
     private void OnLocationChanged(object? sender, LocationChangedEventArgs e)

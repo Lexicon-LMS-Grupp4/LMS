@@ -4,9 +4,9 @@ using Domain.Contracts.Storage;
 using Domain.Models.Entities;
 using Domain.Models.Exceptions;
 using LMS.Infractructure.Extensions;
+using LMS.Services.Access;
 using LMS.Shared.DTOs.Common;
 using LMS.Shared.DTOs.Document;
-using Microsoft.AspNetCore.Identity;
 using Service.Contracts;
 
 namespace LMS.Services;
@@ -17,14 +17,17 @@ namespace LMS.Services;
 public class DocumentService(
     IUnitOfWork unitOfWork,
     IMapper mapper,
-    IFileStorage fileStorage,
-    IUserService userService,
-    UserManager<ApplicationUser> userManager) : IDocumentService
+    IDocumentManager documentManager,
+    ILmsRelationResolver lmsRelationResolver,
+    ILmsAccessService lmsAccessService,
+    IUserAccessContextFactory userAccessContextFactory) : IDocumentService
 {
-    private readonly UserManager<ApplicationUser> _userManager = userManager;
     private readonly IUnitOfWork _unitOfWork = unitOfWork;
     private readonly IMapper _mapper = mapper;
-    private readonly IFileStorage _fileStorage = fileStorage;
+    private readonly ILmsRelationResolver _lmsRelationResolver = lmsRelationResolver;
+    private readonly ILmsAccessService _lmsAccessService = lmsAccessService;
+    private readonly IUserAccessContextFactory _userAccessContextFactory = userAccessContextFactory;
+    private readonly IDocumentManager _documentManager = documentManager;
 
     /// <summary>
     /// Retrieves a paged list of documents accessible to the specified user.
@@ -36,20 +39,13 @@ public class DocumentService(
     /// <returns>A paged result containing accessible documents.</returns>
     public async Task<PagedResultDto<DocumentDto>> GetDocumentsAsync(string userId, int page, int pageSize, DocumentQueryDto dto)
     {
-        // TODO: don't use UserService in this service, instead create UserRepository for
-        // getting GetUserWithRelationsAsync
-        var user = await userService.GetUserWithRelationsAsync(userId) ??
-            throw new UnauthorizedAccessException($"User by id {userId} does not exist");
 
-        var isTeacher = await _userManager.IsInRoleAsync(user, "Teacher");
+        // TODO: use CancellationToken
+        var access = await _userAccessContextFactory.CreateAsync(userId);
 
-        var query = ApplyDocumentAccessFilter(
+        var query = _lmsAccessService.ApplyDocumentAccessFilter(
             _unitOfWork.Documents.BuildBasicQuery(dto),
-            userId,
-            isTeacher,
-            isTeacher ? user.TeachingCourses.Select(tc => tc.CourseId).ToList() :
-                new List<int> { user.CourseId ?? 0 });
-
+            access);
 
         var (documents, totalCount) = await query
             .OrderByDescending(d => d.UploadedAt)
@@ -80,7 +76,8 @@ public class DocumentService(
         var document = await _unitOfWork.Documents.GetDocumentWithAccessRelationsAsync(id, false)
             ?? throw new NotFoundException($"Document with id {id} does not exist");
 
-        await EnsureDocumentAccess(userId, document);
+        // TODO add cancellation token
+        await EnsureDocumentExistsAndAccessibleAsync(userId, document);
 
         return _mapper.Map<DocumentDto>(document);
     }
@@ -99,14 +96,15 @@ public class DocumentService(
         var document = await _unitOfWork.Documents.GetDocumentWithAccessRelationsAsync(id)
             ?? throw new NotFoundException($"Document with id {id} does not exist");
 
-        await EnsureDocumentAccess(userId, document);
+        // TODO add cancellation token
+        await EnsureDocumentExistsAndAccessibleAsync(userId, document);
 
         if (string.IsNullOrWhiteSpace(document.StoredFileName))
         {
             throw new NotFoundException("File not found.");
         }
 
-        var stream = await _fileStorage.OpenReadAsync(document.StoredFileName);
+        var stream = await _documentManager.OpenReadAsync(document);
 
         var contentType = string.IsNullOrWhiteSpace(document.ContentType)
             ? "application/octet-stream"
@@ -136,26 +134,21 @@ public class DocumentService(
             throw new BadRequestException("File is missing.");
         }
 
-        var user = await _userManager.FindByIdAsync(userId) ??
-            throw new UnauthorizedAccessException($"User by id {userId} does not exist");
-
         await ValidateCreateAccessAsync(userId, dto);
 
-        var savedFileResult = await _fileStorage.SaveAsync(dto.File);
+        var document = await _documentManager.CreateEntityAsync(
+            userId,
+            courseId: dto.CourseId,
+            moduleId: dto.ModuleId,
+            activityId: dto.ActivityId,
+            submissionId: dto.SubmissionId,
+            description: dto.Description);
 
-        var document = _mapper.Map<Document>(dto);
+        await _documentManager.AttachFileAsync(document, dto.File);
+        await _documentManager.SaveDocumentAsync(document);
 
-        document.UploadedByUser = user;
-        document.UploadedAt = DateTime.UtcNow;
-        document.FileSize = savedFileResult.FileSize;
-        document.StoredFileName = savedFileResult.FileName;
-
-        var course = ResolveCourse(document);
-
-        _unitOfWork.Documents.Create(document);
-        await _unitOfWork.CompleteAsync();
-
-        var createdDocument = await _unitOfWork.Documents.GetDocumentWithAccessRelationsAsync(document.Id);
+        var createdDocument = await _unitOfWork.Documents.GetDocumentAsync(document.Id)
+            ?? throw new NotFoundException($"Document with id {document.Id} does not exist after creation.");
 
         return _mapper.Map<DocumentDto>(createdDocument);
     }
@@ -164,7 +157,6 @@ public class DocumentService(
     {
         if (dto.SubmissionId is not null)
         {
-            // TODO: avoid this duplicated logic with EnsureDocumentAccess, refactor it and make it more generic, maybe move it to its own service
             var submission = await _unitOfWork.Submissions.GetSubmissionWithRelationsAsync(dto.SubmissionId.Value)
                 ?? throw new NotFoundException($"Submission with id {dto.SubmissionId.Value} was not found.");
 
@@ -173,13 +165,19 @@ public class DocumentService(
                 return; // owner allowed direkt
             }
 
-            EnsureTeacherForCourse(userId, submission.Activity.Module.Course);
+            var course = _lmsRelationResolver.ResolveCourse(submission);
+            //await _lmsAccessService.EnsureTeacherForCourseAsync(userId, course);
             return;
         }
 
-        // alla andra fall
-        var course = await ResolveCourseForDocumentAsync(dto);
-        EnsureTeacherForCourse(userId, course);
+        // all other cases
+        var targetCourse = await _lmsRelationResolver.ResolveCourseForDocumentTargetAsync(
+            dto.CourseId,
+            dto.ModuleId,
+            dto.ActivityId,
+            dto.SubmissionId);
+
+        //await _lmsAccessService.EnsureTeacherForCourseAsync(userId, targetCourse);
 
     }
 
@@ -193,10 +191,10 @@ public class DocumentService(
     /// </exception>
     public async Task<DocumentDto> UpdateDocumentAsync(int id, string userId, UpdateDocumentDto dto)
     {
-        var document = await _unitOfWork.Documents.GetDocumentAsync(id, trackChanges: true) ??
+        var document = await _unitOfWork.Documents.GetDocumentWithAccessRelationsAsync(id, trackChanges: true) ??
             throw new NotFoundException($"Document with id {id} does not exist");
 
-        await EnsureDocumentAccess(userId, document);
+        await EnsureDocumentExistsAndModifiableAsync(userId, document);
 
         document.DisplayName = dto.DisplayName ?? string.Empty;
         document.Description = dto.Description ?? string.Empty;
@@ -224,150 +222,52 @@ public class DocumentService(
         var document = await _unitOfWork.Documents.GetDocumentWithAccessRelationsAsync(id)
             ?? throw new NotFoundException($"Document with id: '{id}' does not exist");
 
-        await EnsureDocumentAccess(userId, document);
+        await EnsureDocumentExistsAndDeletableAsync(userId, document);
 
         // TODO: option to soft delete instead of hard delete, add IsDeleted property to Document entity and filter it out in queries
 
         // remove the file from storage if it exists
-        if (!string.IsNullOrWhiteSpace(document.StoredFileName))
-        {
-            var success = await _fileStorage.DeleteAsync(document.StoredFileName);
-            if (!success)
-            {
-                // log the failure to delete the file, but do not prevent the document record from being deleted
-                // consider implementing a retry mechanism or marking the document for cleanup if file deletion fails
-            }
-        }
+        await _documentManager.DeleteFileAsync(document);
 
         _unitOfWork.Documents.Delete(document);
         await _unitOfWork.CompleteAsync();
     }
 
-    /// <summary>
-    /// Ensures that the user has access to the specified document.
-    /// </summary>
-    /// <param name="userId">The user identifier.</param>
-    /// <param name="document">The document to check.</param>
-    /// <exception cref="NotFoundException">
-    /// Thrown if the user is not authorized to access the document.
-    /// </exception>
-    private async Task EnsureDocumentAccess(string userId, Document document)
+    private async Task EnsureDocumentExistsAndAccessibleAsync(string userId, Document document, CancellationToken ct = default)
     {
-        if (document.UploadedByUserId != userId)
+        try
         {
-            var course = ResolveCourse(document);
-
-            if (course == null || !IsTeacherForCourse(userId, course))
-            {
-                // pretend the file doesn't exist to prevent data leakage
-                throw new NotFoundException($"Document with id {document.Id} does not exist");
-            }
+            await _lmsAccessService.EnsureCanAccessDocumentAsync(userId, document, ct);
+        }
+        catch (ForbiddenException)
+        {
+            // don't reveal the existence of the document if the user is not authorized to access it
+            throw new NotFoundException($"Document with id {document.Id} does not exist");
         }
     }
 
-    /// <summary>
-    /// Resolves the course associated with a document.
-    /// </summary>
-    /// <param name="d">The document.</param>
-    /// <returns>The associated course, if any.</returns>
-    private static Course? ResolveCourse(Document d)
+    private async Task EnsureDocumentExistsAndModifiableAsync(string userId, Document document, CancellationToken ct = default)
     {
-        return d.Course
-            ?? d.Module?.Course
-            ?? d.Activity?.Module?.Course
-            ?? d.Submission?.Activity?.Module?.Course;
-    }
-
-    private async Task<Course> ResolveCourseForDocumentAsync(CreateDocumentDto dto)
-    {
-        // TODO: refactor this and ResolveCourse, make it more generic and take e special dto with only
-        // ActivityId, ModuleId, CourseId and SubmissionId, and move it to its own service
-        if (dto.CourseId is not null)
+        try
         {
-            return await _unitOfWork.Courses.GetCourseAsync(dto.CourseId.Value)
-                ?? throw new NotFoundException($"Course with id {dto.CourseId.Value} was not found.");
+            await _lmsAccessService.EnsureCanModifyDocumentAsync(userId, document, ct);
         }
-
-        if (dto.ModuleId is not null)
+        catch (ForbiddenException)
         {
-            var module = await _unitOfWork.Modules.GetModuleAsync(dto.ModuleId.Value)
-                ?? throw new NotFoundException($"Module with id {dto.ModuleId.Value} was not found.");
-
-            return module.Course;
-        }
-
-        if (dto.ActivityId is not null)
-        {
-            var activity = await _unitOfWork.Activities.GetActivityWithRelationsAsync(dto.ActivityId.Value)
-                ?? throw new NotFoundException($"Activity with id {dto.ActivityId.Value} was not found.");
-
-            return activity.Module.Course;
-        }
-
-        if (dto.SubmissionId is not null)
-        {
-            var submission = await _unitOfWork.Submissions.GetSubmissionWithRelationsAsync(dto.SubmissionId.Value)
-                ?? throw new NotFoundException($"Submission with id {dto.SubmissionId.Value} was not found.");
-
-            return submission.Activity.Module.Course;
-        }
-
-        throw new BadRequestException("Document must belong to a course, module, activity or submission.");
-    }
-
-    /// <summary>
-    /// Determines whether a user is a teacher for a given course.
-    /// </summary>
-    /// <param name="userId">The user identifier.</param>
-    /// <param name="course">The course.</param>
-    /// <returns><c>true</c> if the user is a teacher for the course; otherwise, <c>false</c>.</returns>
-    private static bool IsTeacherForCourse(string userId, Course course)
-    {
-        return course.CourseTeachers.Any(t => t.TeacherId == userId);
-    }
-
-    private static void EnsureTeacherForCourse(string userId, Course course)
-    {
-        if (!IsTeacherForCourse(userId, course))
-        {
-            throw new ForbiddenException("Only teachers for this course allowed for this operation.");
+            // don't reveal the existence of the document if the user is not authorized to access it
+            throw new NotFoundException($"Document with id {document.Id} does not exist");
         }
     }
-
-    /// <summary>
-    /// Applies access control rules to a document query.
-    /// </summary>
-    /// <param name="query">The document query.</param>
-    /// <param name="userId">The user identifier.</param>
-    /// <param name="isTeacher">Indicates whether the user is a teacher.</param>
-    /// <param name="allowedCourseIds">The course IDs the user has access to.</param>
-    /// <returns>A filtered query containing only accessible documents.</returns>
-    private IQueryable<Document> ApplyDocumentAccessFilter(IQueryable<Document> query,
-                                                           string userId,
-                                                           bool isTeacher,
-                                                           List<int> allowedCourseIds)
+    private async Task EnsureDocumentExistsAndDeletableAsync(string userId, Document document, CancellationToken ct = default)
     {
-        if (isTeacher)
+        try
         {
-            return query.Where(d =>
-                (d.SubmissionId == null && (
-                    (d.CourseId != null && allowedCourseIds.Contains(d.CourseId.Value)) ||
-                    (d.Module != null && allowedCourseIds.Contains(d.Module.CourseId)) ||
-                    (d.Activity != null && allowedCourseIds.Contains(d.Activity.Module.CourseId))
-                ))
-                ||
-                (d.Submission != null && allowedCourseIds.Contains(d.Submission.Activity.Module.CourseId))
-            );
+            await _lmsAccessService.EnsureCanDeleteDocumentAsync(userId, document, ct);
         }
-
-        return query.Where(d =>
-            (d.SubmissionId == null && (
-                (d.CourseId != null && allowedCourseIds.Contains(d.CourseId.Value)) ||
-                (d.Module != null && allowedCourseIds.Contains(d.Module.CourseId)) ||
-                (d.Activity != null && allowedCourseIds.Contains(d.Activity.Module.CourseId))
-            ))
-            ||
-            (d.Submission != null && d.Submission.StudentId == userId)
-        );
+        catch (ForbiddenException)
+        {
+            // don't reveal the existence of the document if the user is not authorized to access it
+            throw new NotFoundException($"Document with id {document.Id} does not exist");
+        }
     }
 }

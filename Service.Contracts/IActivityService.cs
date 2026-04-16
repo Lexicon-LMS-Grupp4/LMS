@@ -1,5 +1,6 @@
 ﻿using LMS.Shared.DTOs.Activity;
 using LMS.Shared.DTOs.Common;
+using LMS.Shared.Request;
 
 namespace Service.Contracts
 {
@@ -8,12 +9,12 @@ namespace Service.Contracts
     /// </summary>
     public interface IActivityService
     {
-        Task<PagedResultDto<ActivityDto>> GetAllActivitiesAsync(int page, int pageSize, int? moduleId = null);
-        Task<ActivityDto> GetActivityByIdAsync(int id);
-        Task<ActivityDetailDto> GetActivityDetailByIdAsync(int id);
-        Task<ActivityDto> CreateActivityAsync(CreateActivityDto dto);
-        Task UpdateActivityAsync(int id, UpdateActivityDto dto);
-        Task PatchActivityAsync(int id, PatchActivityDto dto);
-        Task DeleteActivityAsync(int id);
+        Task<PagedResultDto<ActivityDto>> GetAllActivitiesAsync(string userId, ActivitiesRequestParams query);
+        Task<ActivityDto> GetActivityByIdAsync(int id, string userId);
+        Task<ActivityDetailDto> GetActivityDetailByIdAsync(int id, string userId);
+        Task<ActivityDto> CreateActivityAsync(string userId, CreateActivityDto dto);
+        Task UpdateActivityAsync(int id, string userId, UpdateActivityDto dto);
+        Task PatchActivityAsync(int id, string userId, PatchActivityDto dto);
+        Task DeleteActivityAsync(int id, string userId);
     }
 }

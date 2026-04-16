@@ -1,0 +1,75 @@
+@using LMS.Shared.DTOs.Document
+@inject IDocumentService DocumentService
+
+<BbDialog @bind-Open="Open">
+    <BbDialogContent>
+        <BbDialogHeader>
+            <BbDialogTitle>Edit Document Details</BbDialogTitle>
+            <BbDialogDescription>
+                Update the display name and description for this document.
+            </BbDialogDescription>
+        </BbDialogHeader>
+
+        <div class="d-flex flex-column gap-3 py-2">
+            @if (editDto != null)
+            {
+                <div>
+                    <label class="form-label fw-medium mb-1" style="font-size:0.875rem;">Display Name</label>
+                    <BbInput @bind-Value="editDto.DisplayName" Placeholder="e.g. Project Specification" />
+                </div>
+
+                <div>
+                    <label class="form-label fw-medium mb-1" style="font-size:0.875rem;">Description</label>
+                    <BbTextarea @bind-Value="editDto.Description" 
+                                Placeholder="Provide a brief description of the document..." 
+                                Rows="3" />
+                </div>
+            }
+        </div>
+
+        <BbDialogFooter>
+            <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => OpenChanged.InvokeAsync(false))">Cancel</BbButton>
+            <BbButton OnClick="HandleSave">Save Changes</BbButton>
+        </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
+
+@code {
+    [Parameter] public bool Open { get; set; }
+    [Parameter] public EventCallback<bool> OpenChanged { get; set; }
+    [Parameter] public DocumentDto? Document { get; set; }
+    [Parameter] public EventCallback<DocumentDto> OnSave { get; set; }
+
+    private LMS.Shared.DTOs.Document.UpdateDocumentDto? editDto;
+    private int? currentDocumentId;
+
+    protected override void OnParametersSet()
+    {
+        if (Document != null && currentDocumentId != Document.Id)
+        {
+            currentDocumentId = Document.Id;
+            editDto = new LMS.Shared.DTOs.Document.UpdateDocumentDto
+            {
+                DisplayName = Document.DisplayName,
+                Description = Document.Description,
+                CourseId = Document.CourseId,
+                ModuleId = Document.ModuleId,
+                ActivityId = Document.ActivityId,
+                SubmissionId = Document.SubmissionId
+            };
+        }
+    }
+
+    private async Task HandleSave()
+    {
+        if (Document is not null && editDto is not null)
+        {
+            var updated = await DocumentService.UpdateDocumentAsync(Document.Id, editDto);
+            if (updated is not null)
+            {
+                await OnSave.InvokeAsync(updated);
+                await OpenChanged.InvokeAsync(false);
+            }
+        }
+    }
+}

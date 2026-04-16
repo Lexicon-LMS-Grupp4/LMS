@@ -53,11 +53,12 @@
         </BbCardContent>
 
         <BbCardFooter Class="px-4 pb-4 pt-0 d-flex justify-content-between align-items-center">
-            <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small"
-                      OnClick="@(() => OnViewActivities.InvokeAsync(Module.Id))">
-                Activities
-                <BbBadge Variant="BadgeVariant.Secondary" Class="ms-1">@Module.ActivityCount</BbBadge>
-            </BbButton>
+            <div class="d-flex gap-2">
+                <BbButton Variant="ButtonVariant.Default" Size="ButtonSize.Small"
+                          OnClick="@(() => OnGoToModule.InvokeAsync(Module.Id))">
+                    Go to Module
+                </BbButton>
+            </div>
             @if (IsTeacher)
             {
                 <div class="d-flex gap-2">
@@ -80,18 +81,24 @@
     [Parameter] public EventCallback<int> OnCycleGradient { get; set; }
     [Parameter] public EventCallback<ModuleDto> OnEdit { get; set; }
     [Parameter] public EventCallback<int> OnDelete { get; set; }
-    [Parameter] public EventCallback<int> OnViewActivities { get; set; }
+    [Parameter] public EventCallback<int> OnGoToModule { get; set; }
 
-    private (string Label, BadgeVariant Variant) Status => DateTime.Now switch
+    private (string Label, BadgeVariant Variant) Status
     {
-        var n when Module.EndDate < n => ("Completed", BadgeVariant.Secondary),
-        var n when Module.StartDate > n => ("Upcoming", BadgeVariant.Outline),
-        _ => ("Active", BadgeVariant.Default),
-    };
+        get
+        {
+            var now = DateTime.Now;
+            if (Module.EndDate < Module.StartDate) return ("Invalid Range", BadgeVariant.Outline);
+            if (Module.EndDate < now) return ("Completed", BadgeVariant.Secondary);
+            if (Module.StartDate > now) return ("Upcoming", BadgeVariant.Outline);
+            return ("Active", BadgeVariant.Default);
+        }
+    }
 
     private int GetProgress()
     {
         var total = (Module.EndDate - Module.StartDate).TotalDays;
+        if (total <= 0) return 0;
         var elapsed = (DateTime.Now - Module.StartDate).TotalDays;
         return (int)Math.Clamp(elapsed / total * 100, 0, 100);
     }

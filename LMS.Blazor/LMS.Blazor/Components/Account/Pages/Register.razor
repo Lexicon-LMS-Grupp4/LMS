@@ -17,42 +17,93 @@
 
 <PageTitle>Register</PageTitle>
 
-<h1>Register</h1>
+<div class="mb-4 text-center">
+    <h1 class="display-4 fw-bold">Lexicon LMS</h1>
+    <p class="lead text-muted">Learning Platform</p>
+</div>
 
-<div class="row">
-    <div class="col-lg-6">
-        <StatusMessage Message="@Message" />
-        <EditForm Model="Input" method="post" OnValidSubmit="RegisterUser" FormName="register">
-            <DataAnnotationsValidator />
-            <h2>Create a new account.</h2>
-            <hr />
-            <ValidationSummary class="text-danger" role="alert" />
-            <div class="form-floating mb-3">
-                <InputText @bind-Value="Input.Email" id="Input.Email" class="form-control" autocomplete="username" aria-required="true" placeholder="name@example.com" />
-                <label for="Input.Email">Email</label>
-                <ValidationMessage For="() => Input.Email" class="text-danger" />
+<div class="row justify-content-center">
+    <div class="col-lg-5 col-md-7">
+
+        <div class="card shadow border-0">
+            <div class="card-body p-4">
+
+                <StatusMessage Message="@Message" />
+
+                <EditForm Model="Input" method="post" OnValidSubmit="RegisterUser" FormName="register">
+                    <DataAnnotationsValidator />
+
+                    <p class="text-muted mb-4 text-center">
+                        Create a new account to get started.
+                    </p>
+
+                    <ValidationSummary class="text-danger" role="alert" />
+
+                    <div class="form-floating mb-3">
+                        <InputText @bind-Value="Input.UserName"
+                                   id="Input.UserName"
+                                   class="form-control"
+                                   placeholder="username" />
+                        <label for="Input.UserName">Username</label>
+                        <ValidationMessage For="() => Input.UserName" class="text-danger" />
+                    </div>
+
+                    <div class="form-floating mb-3">
+                        <InputText @bind-Value="Input.Email"
+                                   id="Input.Email"
+                                   class="form-control"
+                                   autocomplete="username"
+                                   placeholder="name@example.com" />
+                        <label for="Input.Email">Email</label>
+                        <ValidationMessage For="() => Input.Email" class="text-danger" />
+                    </div>
+
+                    <div class="form-floating mb-3">
+                        <InputText type="password"
+                                   @bind-Value="Input.Password"
+                                   id="Input.Password"
+                                   class="form-control"
+                                   autocomplete="new-password"
+                                   placeholder="password" />
+                        <label for="Input.Password">Password</label>
+                        <ValidationMessage For="() => Input.Password" class="text-danger" />
+                    </div>
+
+                    <div class="form-floating mb-4">
+                        <InputText type="password"
+                                   @bind-Value="Input.ConfirmPassword"
+                                   id="Input.ConfirmPassword"
+                                   class="form-control"
+                                   autocomplete="new-password"
+                                   placeholder="password" />
+                        <label for="Input.ConfirmPassword">Confirm Password</label>
+                        <ValidationMessage For="() => Input.ConfirmPassword" class="text-danger" />
+                    </div>
+
+                    <button type="submit" class="w-100 btn btn-primary btn-lg">
+                        Register
+                    </button>
+
+                    <hr />
+
+                    <div class="text-center small">
+                        <span class="text-muted">Already have an account?</span><br />
+                        <a href="/Account/Login">Log in</a>
+                    </div>
+
+                </EditForm>
+
             </div>
-            <div class="form-floating mb-3">
-                <InputText type="password" @bind-Value="Input.Password" id="Input.Password" class="form-control" autocomplete="new-password" aria-required="true" placeholder="password" />
-                <label for="Input.Password">Password</label>
-                <ValidationMessage For="() => Input.Password" class="text-danger" />
-            </div>
-            <div class="form-floating mb-3">
-                <InputText type="password" @bind-Value="Input.ConfirmPassword" id="Input.ConfirmPassword" class="form-control" autocomplete="new-password" aria-required="true" placeholder="password" />
-                <label for="Input.ConfirmPassword">Confirm Password</label>
-                <ValidationMessage For="() => Input.ConfirmPassword" class="text-danger" />
-            </div>
-            <button type="submit" class="w-100 btn btn-lg btn-primary">Register</button>
-        </EditForm>
-    </div>
-    <div class="col-lg-4 col-lg-offset-2">
-        <section>
-            <h3>Use another service to register.</h3>
-            <hr />
-            <ExternalLoginPicker />
-        </section>
+        </div>
+
     </div>
 </div>
+
+<style>
+    main {
+        background-color: #ececec;
+    }
+</style>
 
 @code {
     private IEnumerable<IdentityError>? identityErrors;
@@ -74,7 +125,7 @@
     {
         var user = CreateUser();
 
-        await UserStore.SetUserNameAsync(user, Input.Email, CancellationToken.None);
+        await UserStore.SetUserNameAsync(user, Input.UserName, CancellationToken.None);
         var emailStore = GetEmailStore();
         await emailStore.SetEmailAsync(user, Input.Email, CancellationToken.None);
         var result = await UserManager.CreateAsync(user, Input.Password);
@@ -106,8 +157,9 @@
         }
         else
         {
-            await SignInManager.SignInAsync(user, isPersistent: false);
-            RedirectManager.RedirectTo(ReturnUrl);
+            // await SignInManager.SignInAsync(user, isPersistent: false);
+            // RedirectManager.RedirectTo(ReturnUrl);
+            RedirectManager.RedirectTo("Account/Login");
         }
     }
 
@@ -135,6 +187,11 @@
 
     private sealed class InputModel
     {
+        [Required]
+        [Display(Name = "Username")]
+        [StringLength(50, MinimumLength = 3)]
+        public string UserName { get; set; } = "";
+
         [Required]
         [EmailAddress]
         [Display(Name = "Email")]

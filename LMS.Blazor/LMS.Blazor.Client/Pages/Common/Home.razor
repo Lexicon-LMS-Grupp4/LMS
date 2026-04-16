@@ -1,7 +1,15 @@
 ﻿@page "/"
+@using LMS.Blazor.Client.Pages.Admin
+@using LMS.Blazor.Client.Pages.Student
 
-<PageTitle>Home</PageTitle>
-
-<h1>Hello, world!</h1>
-
-Welcome to your new app.
+<AuthorizeView Roles="Teacher">
+    <TeacherDashboard />
+</AuthorizeView>
+<AuthorizeView Roles="Student">
+    <StudentDashboard />
+</AuthorizeView>
+<AuthorizeView>
+    <NotAuthorized>
+        <RedirectToLogin />
+    </NotAuthorized>
+</AuthorizeView>

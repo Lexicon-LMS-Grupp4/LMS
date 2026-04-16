@@ -1,9 +1,14 @@
 ﻿using AutoMapper;
 using Domain.Contracts.Repositories;
+using Domain.Contracts.Storage;
 using Domain.Models.Entities;
 using Domain.Models.Exceptions;
+using LMS.Infractructure.Extensions;
+using LMS.Services.Access;
 using LMS.Shared.DTOs.Common;
 using LMS.Shared.DTOs.Submission;
+using LMS.Shared.Request;
+using Microsoft.AspNetCore.Http;
 using Service.Contracts;
 
 namespace LMS.Services;
@@ -15,38 +20,66 @@ public class SubmissionService : ISubmissionService
 {
     private readonly IUnitOfWork unitOfWork;
     private readonly IMapper mapper;
-    public SubmissionService(IUnitOfWork unitOfWork, IMapper mapper)
+    private readonly IDocumentManager documentManager;
+    private readonly ILmsAccessService lmsAccessService;
+    private readonly IUserAccessContextFactory userAccessContextFactory;
+    public SubmissionService(IUnitOfWork unitOfWork,
+                             IMapper mapper,
+                             ILmsAccessService lmsAccessService,
+                             IUserAccessContextFactory userAccessContextFactor,
+                             IDocumentManager documentManager)
     {
         this.unitOfWork = unitOfWork;
         this.mapper = mapper;
+        this.lmsAccessService = lmsAccessService;
+        this.userAccessContextFactory = userAccessContextFactor;
+        this.documentManager = documentManager;
     }
-    public async Task<PagedResultDto<SubmissionDto>> GetAllSubmissionsAsync(int page,
-                                                                            int pageSize,
-                                                                            int? activityId = null,
-                                                                            string? studentId = null)
+    public async Task<PagedResultDto<SubmissionDto>> GetAllSubmissionsAsync(string userId, SubmissionsRequestParams queryDto)
     {
-        var (submissions, totalCount) = await unitOfWork.Submissions.GetAllSubmissionsAsync(page, pageSize, activityId, studentId);
+        if (queryDto.ActivityId != null)
+        {
+            var activity = await unitOfWork.Activities.GetActivityWithRelationsAsync(queryDto.ActivityId.Value)
+                ?? throw new NotFoundException($"Activity with id {queryDto.ActivityId.Value} was not found.");
+            await lmsAccessService.EnsureCanAccessActivityAsync(userId, activity);
+        }
+
+        var access = await userAccessContextFactory.CreateAsync(userId);
+
+        var query = lmsAccessService.ApplySubmissionAccessFilter(
+            unitOfWork.Submissions.BuildQuery(queryDto.ActivityId, queryDto.StudentId),
+            access);
+
+        var (submissions, totalCount) = await query
+            .OrderBy(s => s.SubmittedAt)
+            .PagedResult(queryDto.Page, queryDto.PageSize);
 
         return new PagedResultDto<SubmissionDto>
         {
             Items = mapper.Map<List<SubmissionDto>>(submissions),
             TotalCount = totalCount,
-            PageNumber = page,
-            PageSize = pageSize
+            PageNumber = queryDto.Page,
+            PageSize = queryDto.PageSize
         };
+
     }
 
-    public async Task<SubmissionDto> GetSubmissionByIdAsync(int id)
+    public async Task<SubmissionDto> GetSubmissionByIdAsync(int id, string userId)
     {
-        var submission = await unitOfWork.Submissions.GetSubmissionAsync(id)
+        var submission = await unitOfWork.Submissions.GetSubmissionWithRelationsAsync(id)
             ?? throw new NotFoundException($"Submission with id {id} was not found.");
+
+        await lmsAccessService.EnsureCanAccessSubmissionAsync(userId, submission);
 
         return mapper.Map<SubmissionDto>(submission);
     }
-    public async Task<SubmissionDetailDto> GetSubmissionDetailByIdAsync(int id)
+    public async Task<SubmissionDetailDto> GetSubmissionDetailByIdAsync(int id, string userId)
     {
-        var submission = await unitOfWork.Submissions.GetSubmissionAsync(id)
+        var submission = await unitOfWork.Submissions.GetSubmissionWithRelationsAsync(id)
             ?? throw new NotFoundException($"Submission with id {id} was not found.");
+
+        await lmsAccessService.EnsureCanAccessSubmissionAsync(userId, submission);
+
         return mapper.Map<SubmissionDetailDto>(submission);
     }
 
@@ -54,126 +87,185 @@ public class SubmissionService : ISubmissionService
     {
         ArgumentNullException.ThrowIfNull(dto);
 
-        var activity = await unitOfWork.Activities.FindByIdOrThrowAsync(dto.ActivityId);
+        var activity = await unitOfWork.Activities.GetActivityWithRelationsAsync(dto.ActivityId)
+            ?? throw new NotFoundException($"Activity with id {dto.ActivityId} was not found.");
+
+        await lmsAccessService.EnsureCanAccessActivityAsync(userId, activity);
+
+        var existingSubmission = await unitOfWork.Submissions.GetByActivityAndStudentAsync(dto.ActivityId, userId, trackChanges: true);
+        if (existingSubmission is not null)
+        {
+            var timelineComment = BuildResubmissionTimelineComment(existingSubmission, dto.Body, dto.File, dto.RemoveFile);
+
+            existingSubmission.Body = dto.Body;
+            existingSubmission.SubmittedAt = DateTime.Now;
+            existingSubmission.IsLate = activity.EndTime < DateTime.Now;
+
+            if (dto.File != null)
+            {
+                await documentManager.ReplaceForSubmissionAsync(existingSubmission, dto.File, dto.FileDescription);
+            }
+            else if (dto.RemoveFile)
+            {
+                await documentManager.RemoveFromSubmissionAsync(existingSubmission);
+                await unitOfWork.CompleteAsync();
+            }
+            else
+            {
+                await unitOfWork.CompleteAsync();
+            }
+
+            if (!string.IsNullOrWhiteSpace(timelineComment))
+            {
+                existingSubmission.Comments.Add(SubmissionComment.CreateNew(existingSubmission.Id, userId, timelineComment));
+                await unitOfWork.CompleteAsync();
+            }
+
+            return mapper.Map<SubmissionDto>(existingSubmission);
+        }
 
         var submission = mapper.Map<Submission>(dto);
         submission.StudentId = userId;
-        submission.SubmittedAt = DateTime.UtcNow;
-        submission.IsLate = activity.EndTime < DateTime.UtcNow;
-
-        await ThrowIfNotValidSubmission(submission);
+        submission.SubmittedAt = DateTime.Now;
+        submission.IsLate = activity.EndTime < DateTime.Now;
 
         unitOfWork.Submissions.Create(submission);
         await unitOfWork.CompleteAsync();
 
         // refetch new submission with navprops to verify it exists
-        var createdSubmission = await unitOfWork.Submissions.GetSubmissionAsync(submission.Id)
+        var createdSubmission = await unitOfWork.Submissions.GetSubmissionAsync(submission.Id, trackChanges: true)
             ?? throw new InvalidOperationException($"Submission with id {submission.Id} could not be loaded after creation.");
+
+        if (dto.File != null)
+        {
+            var document = await documentManager.CreateEntityAsync(
+                userId,
+                submissionId: createdSubmission.Id,
+                description: dto.FileDescription);
+
+            await documentManager.AttachFileAsync(document, dto.File);
+            await documentManager.SaveDocumentAsync(document);
+
+            createdSubmission.Document = document;
+            await unitOfWork.CompleteAsync();
+        }
 
         return mapper.Map<SubmissionDto>(createdSubmission);
     }
-
-    private async Task ThrowIfNotValidSubmission(Submission submission)
+    public async Task UpdateSubmissionAsync(int id, string userId, UpdateSubmissionDto dto)
     {
-        await ThrowIfNotValidSubmission(submission.ActivityId, submission.StudentId);
+        ArgumentNullException.ThrowIfNull(dto);
+        var submission = await GetStudentAccessedSubmission(id, userId);
+
+        await InternallyUpdateSubmissionAsync(submission, dto.Body, dto.ActivityId, dto.File, dto.FileDescription, dto.RemoveFile);
     }
 
-    private async Task ThrowIfNotValidSubmission(int activityId, string submissionUserId)
-    {
-        // TODO: uncomment and implement properly when we have users and activities working with modules and courses
-        //var activity = await unitOfWork.Activities.GetActivityAsync(activityId) ??
-        //    throw new KeyNotFoundException($"Activity with id {activityId} was not found.");
-
-        //ApplicationUser user = await unitOfWork.Users.GetUserAsync(submissionUserId);
-        //if (user == null)
-        //{
-        //    throw new KeyNotFoundException($"User with id {submissionUserId} does not exist.");
-        //}
-        //if (user.CourseId != activity.Module.CourseId) // TODO: only works if activity includes module and course
-        //{
-        //    throw new ForbiddenException($"User with id {submissionUserId} is not enrolled in the course for this activity.");
-        //}
-    }
-
-
-
-    public async Task UpdateSubmissionAsync(int id, UpdateSubmissionDto dto)
+    public async Task UpdateSubmissionPartiallyAsync(int id, string userId, PatchSubmissionDto dto)
     {
         ArgumentNullException.ThrowIfNull(dto);
 
-        var submission = await unitOfWork.Submissions.FindByIdOrThrowAsync(id, trackChanges: true);
-
-        await InternallyUpdateSubmissionAsync(submission, dto.Body, dto.ActivityId, dto.DocumentId);
-    }
-
-    public async Task UpdateSubmissionPartiallyAsync(int id, PatchSubmissionDto dto)
-    {
-        ArgumentNullException.ThrowIfNull(dto);
-
-        var submission = await unitOfWork.Submissions.GetSubmissionAsync(id, trackChanges: true) ??
-            throw new KeyNotFoundException($"Submission with id {id} does not exist.");
+        var submission = await GetStudentAccessedSubmission(id, userId);
 
         await InternallyUpdateSubmissionAsync(submission,
                                               dto.Body ?? submission.Body ?? string.Empty,
                                               dto.ActivityId ?? submission.Activity.Id,
-                                              dto.DocumentId);
+                                              dto.File ?? null,
+                                              dto.FileDescription ?? submission.Document?.Description,
+                                              false);
     }
-    private async Task InternallyUpdateSubmissionAsync(Submission submission, string body, int activityId, int? documentId)
+    private async Task InternallyUpdateSubmissionAsync(Submission submission, string? body, int? activityId, IFormFile? file, string? fileDescription, bool removeFile)
     {
-        submission.Body = body;
-        if (documentId != null)
+        var timelineComment = BuildResubmissionTimelineComment(submission, body, file, removeFile);
+
+        submission.Body = body ?? submission.Body;
+        submission.ActivityId = activityId ?? submission.ActivityId;
+        if (file != null)
         {
-            submission.Document = await unitOfWork.Documents.FindByIdOrThrowAsync(documentId.Value, trackChanges: true);
+            await documentManager.ReplaceForSubmissionAsync(submission, file, fileDescription);
         }
-        submission.ActivityId = activityId;
+        else if (removeFile && submission.Document is not null)
+        {
+            await documentManager.RemoveFromSubmissionAsync(submission);
+            await unitOfWork.CompleteAsync();
+        }
+        else
+        {
+            await unitOfWork.CompleteAsync();
+        }
 
-        await ThrowIfNotValidSubmission(submission);
-
-        await unitOfWork.CompleteAsync();
+        if (!string.IsNullOrWhiteSpace(timelineComment))
+        {
+            submission.Comments.Add(SubmissionComment.CreateNew(submission.Id, submission.StudentId, timelineComment));
+            await unitOfWork.CompleteAsync();
+        }
     }
-    public async Task DeleteSubmissionAsync(int id)
+    public async Task DeleteSubmissionAsync(int id, string userId)
     {
-        var submission = await unitOfWork.Submissions.FindByIdOrThrowAsync(id, trackChanges: true);
+        var submission = await GetStudentAccessedSubmission(id, userId);
+
+        await documentManager.RemoveFromSubmissionAsync(submission);
 
         unitOfWork.Submissions.Delete(submission);
         await unitOfWork.CompleteAsync();
     }
 
-    public async Task SubmitCommentAsync(int submissionId, string commenterId, SubmitCommentDto dto)
+    public async Task SubmitCommentAsync(int submissionId, string userId, SubmitCommentDto dto)
     {
-        var submission = await unitOfWork.Submissions.GetSubmissionAsync(submissionId, trackChanges: true) ??
-            throw new KeyNotFoundException($"Submission with id {submissionId} does not exist.");
+        var submission = await GetStudentAccessedSubmission(submissionId, userId);
 
-        await ThrowIfNotAuthorizedToComment(submission, commenterId);
-
-        submission.Comments.Add(SubmissionComment.CreateNew(submission.Id, commenterId, dto.CommentText));
+        submission.Comments.Add(SubmissionComment.CreateNew(submission.Id, userId, dto.CommentText));
 
         await unitOfWork.CompleteAsync();
     }
 
-    private async Task ThrowIfNotAuthorizedToComment(Submission submission, string commenterId)
+    private async Task<Submission> GetStudentAccessedSubmission(int id, string userId)
     {
-        // TODO: uncomment and implement properly when we have users and activities working with modules and courses
-        //ApplicationUser user = await unitOfWork.Users.GetUserAsync(commenterId) ??
-        //    throw new KeyNotFoundException($"User with id {commenterId} does not exist.");
-
-        //Activity activity = await unitOfWork.Activities.GetActivityAsync(submission.ActivityId) ??
-        //    throw new KeyNotFoundException($"Activity with id {submission.ActivityId} was not found.");
-        //bool isOwner = submission.StudentId == commenterId;
-        //bool isTeacherOnCourse = user.TeachingCourses.Any(tc => tc.CourseId == activity.Module.CourseId);
-
-        //if (!isOwner && !isTeacherOnCourse)
-        //{
-        //    throw new ForbiddenException($"User not allowed to comment this submission");
-        //}
+        var submission = await unitOfWork.Submissions.GetSubmissionWithRelationsAsync(id, trackChanges: true)
+            ?? throw new NotFoundException($"Submission with id {id} does not exist.");
+        await lmsAccessService.EnsureCanAccessSubmissionAsync(userId, submission);
+        return submission;
     }
 
-    public async Task DeleteCommentAsync(int commentId, string commenterId)
+    public async Task DeleteCommentAsync(int commentId, string userId)
     {
         // TODO: implement if needed
         //var submission = await unitOfWork.Submissions.GetSubmissionAsync(submissionId, trackChanges: true) ??
         //    throw new KeyNotFoundException($"Submission with id {submissionId} does not exist.");
 
-        //await ThrowIfNotAuthorizedToComment(submission, commenterId);
+        //await ThrowIfNotAuthorizedToComment(submission, userId);
     }
+
+    private static string? BuildResubmissionTimelineComment(Submission submission, string? newBody, IFormFile? newFile, bool removeFile)
+    {
+        var previousBody = submission.Body?.Trim();
+        var nextBody = newBody?.Trim();
+
+        var previousFileName = submission.Document?.DisplayName;
+        var nextFileName = removeFile
+            ? null
+            : newFile?.FileName ?? previousFileName;
+
+        var bodyChanged = !string.Equals(previousBody, nextBody, StringComparison.Ordinal);
+        var fileChanged = !string.Equals(previousFileName, nextFileName, StringComparison.Ordinal);
+
+        if (!bodyChanged && !fileChanged)
+        {
+            return null;
+        }
+
+        return string.Join(Environment.NewLine, [
+            "Student resubmitted",
+            string.Empty,
+            "Previous submission",
+            $"Text: {FormatTimelineValue(previousBody)}",
+            $"File: {FormatTimelineValue(previousFileName)}",
+            string.Empty,
+            "New submission",
+            $"Text: {FormatTimelineValue(nextBody)}",
+            $"File: {FormatTimelineValue(nextFileName)}"
+        ]);
+    }
+
+    private static string FormatTimelineValue(string? value)
+        => string.IsNullOrWhiteSpace(value) ? "(none)" : value.Trim();
 }

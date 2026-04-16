@@ -10,19 +10,16 @@ namespace LMS.Presentation.Controllers;
 [Route("api/modules")]
 [ApiController]
 [Authorize]
-public class ModulesController : ControllerBase
+public class ModulesController : LmsControllerBase
 {
-    private readonly IServiceManager serviceManager;
-
-    public ModulesController(IServiceManager serviceManager)
+    public ModulesController(IServiceManager serviceManager) : base(serviceManager)
     {
-        this.serviceManager = serviceManager;
     }
 
     [HttpGet]
     [SwaggerOperation(
         Summary = "Get all modules",
-        Description = "Retrieves a paginated list of all modules, optionally filtered by course"
+        Description = "Retrieves a paginated list of all modules that the user has access to, optionally filtered by course"
     )]
     [SwaggerResponse(StatusCodes.Status200OK, "Modules retrieved successfully")]
     public async Task<IActionResult> GetAllModules(
@@ -30,7 +27,7 @@ public class ModulesController : ControllerBase
         [FromQuery] int pageSize = 10,
         [FromQuery] int? courseId = null)
     {
-        var result = await serviceManager.ModuleService.GetAllModulesAsync(page, pageSize, courseId);
+        var result = await serviceManager.ModuleService.GetAllModulesAsync(UserId, page, pageSize, courseId);
         return Ok(result);
     }
 
@@ -41,10 +38,10 @@ public class ModulesController : ControllerBase
     )]
     [SwaggerResponse(StatusCodes.Status200OK, "Module retrieved successfully")]
     [SwaggerResponse(StatusCodes.Status404NotFound, "Module not found")]
+    [SwaggerResponse(StatusCodes.Status403Forbidden, "Forbidden")]
     public async Task<IActionResult> GetModuleById(int id)
     {
-        // TODO: Validate user access
-        var module = await serviceManager.ModuleService.GetModuleByIdAsync(id);
+        var module = await serviceManager.ModuleService.GetModuleByIdAsync(id, UserId);
         return Ok(module);
     }
 
@@ -55,10 +52,10 @@ public class ModulesController : ControllerBase
     )]
     [SwaggerResponse(StatusCodes.Status200OK, "Module details retrieved successfully")]
     [SwaggerResponse(StatusCodes.Status404NotFound, "Module not found")]
+    [SwaggerResponse(StatusCodes.Status403Forbidden, "Forbidden")]
     public async Task<IActionResult> GetModuleDetail(int id)
     {
-        // TODO: Validate user access
-        var module = await serviceManager.ModuleService.GetModuleDetailByIdAsync(id);
+        var module = await serviceManager.ModuleService.GetModuleDetailByIdAsync(id, UserId);
         return Ok(module);
     }
 
@@ -70,11 +67,11 @@ public class ModulesController : ControllerBase
     [SwaggerResponse(StatusCodes.Status201Created, "Module created successfully")]
     [SwaggerResponse(StatusCodes.Status404NotFound, "Course not found")]
     [SwaggerResponse(StatusCodes.Status400BadRequest, "Invalid input")]
+    [SwaggerResponse(StatusCodes.Status403Forbidden, "Forbidden")]
     [Authorize(Roles = "Teacher")]
     public async Task<IActionResult> CreateModule([FromBody] CreateModuleDto dto)
     {
-        // TODO: Validate user access
-        var module = await serviceManager.ModuleService.CreateModuleAsync(dto);
+        var module = await serviceManager.ModuleService.CreateModuleAsync(UserId, dto);
         return CreatedAtAction(nameof(GetModuleById), new { id = module.Id }, module);
     }
 
@@ -86,11 +83,10 @@ public class ModulesController : ControllerBase
     [SwaggerResponse(StatusCodes.Status204NoContent, "Module updated successfully")]
     [SwaggerResponse(StatusCodes.Status400BadRequest, "Bad request")]
     [SwaggerResponse(StatusCodes.Status404NotFound, "Module not found")]
-    [Authorize(Roles = "Teacher")]
+    [SwaggerResponse(StatusCodes.Status403Forbidden, "Forbidden")]
     public async Task<IActionResult> UpdateModule(int id, [FromBody] UpdateModuleDto dto)
     {
-        // TODO: Validate user access
-        await serviceManager.ModuleService.UpdateModuleAsync(id, dto);
+        await serviceManager.ModuleService.UpdateModuleAsync(id, UserId, dto);
         return NoContent();
     }
 
@@ -102,11 +98,10 @@ public class ModulesController : ControllerBase
     [SwaggerResponse(StatusCodes.Status204NoContent, "Module updated successfully")]
     [SwaggerResponse(StatusCodes.Status400BadRequest, "Bad request")]
     [SwaggerResponse(StatusCodes.Status404NotFound, "Module not found")]
-    [Authorize(Roles = "Teacher")]
+    [SwaggerResponse(StatusCodes.Status403Forbidden, "Forbidden")]
     public async Task<IActionResult> PatchModule(int id, [FromBody] PatchModuleDto dto)
     {
-        // TODO: Validate user access
-        await serviceManager.ModuleService.UpdateModulePartiallyAsync(id, dto);
+        await serviceManager.ModuleService.UpdateModulePartiallyAsync(id, UserId, dto);
         return NoContent();
     }
 
@@ -117,11 +112,10 @@ public class ModulesController : ControllerBase
     )]
     [SwaggerResponse(StatusCodes.Status200OK, "Module deleted successfully")]
     [SwaggerResponse(StatusCodes.Status404NotFound, "Module not found")]
-    [Authorize(Roles = "Teacher")]
+    [SwaggerResponse(StatusCodes.Status403Forbidden, "Forbidden")]
     public async Task<IActionResult> DeleteModule(int id)
     {
-        // TODO: Validate user access
-        await serviceManager.ModuleService.DeleteModuleAsync(id);
+        await serviceManager.ModuleService.DeleteModuleAsync(id, UserId);
         return Ok(new { message = "Module deleted successfully" });
     }
 }

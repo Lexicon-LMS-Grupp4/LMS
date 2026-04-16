@@ -1,0 +1,660 @@
+@page "/admin/documents"
+@page "/student/documents"
+@using LMS.Shared.DTOs.Document
+@using LMS.Shared.DTOs.Course
+@using LMS.Shared.DTOs.Module
+@using LMS.Shared.DTOs.Activity
+@using LMS.Blazor.Client.Components
+@using LMS.Blazor.Client.Components.Document
+@using LMS.Blazor.Client.Uploads
+@using System.Security.Claims
+@inject IDocumentService DocumentService
+@inject ICourseService CourseService
+@inject IModuleService ModuleService
+@inject IActivityService ActivityService
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager Navigation
+@attribute [Authorize]
+
+<PageTitle>Document Management</PageTitle>
+
+<div class="container-fluid py-4 px-4">
+    @* ---- Header ---- *@
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="fw-bold mb-1" style="font-size: 1.75rem;">
+                <i class="bi bi-folder2-open me-2 text-primary"></i>Document Management
+            </h1>
+            <p class="text-muted mb-0">Browse and manage course materials, modules, and work files.</p>
+        </div>
+        <AuthorizeView Roles="Teacher">
+            <button class="btn btn-primary shadow-sm" @onclick="ToggleUploadPanel" disabled="@UploadBtnDisabledState()">
+                <i class="bi @(showUploadPanel ? "bi-dash-lg" : "bi-plus-lg") me-1"></i>
+                @(showUploadPanel ? "Close Panel" : $"Upload Document to {activeLayer}")
+            </button>
+        </AuthorizeView>
+    </div>
+
+    @* ---- Filter Bar ---- *@
+    <div class="card shadow-sm border-0 mb-4 overflow-visible">
+        <div class="card-body p-3">
+            <div class="row g-3 align-items-end">
+                @if (isTeacher)
+                {
+                    <div class="col-md-3">
+                        <label class="form-label small fw-bold mb-1">Course Filter</label>
+                        <select class="form-select" @onchange="OnCourseFilterChanged">
+                            <option value="0">All Courses</option>
+                            @foreach (var c in displayedCourses)
+                            {
+                                <option value="@c.Id" selected="@(selectedCourseId == c.Id)">@c.Name</option>
+                            }
+                        </select>
+                    </div>
+                }
+
+                @if (activeLayer == "Module" || activeLayer == "Activity")
+                {
+                    <div class="@(isTeacher ? "col-md-3" : "col-md-4")">
+                        <label class="form-label small fw-bold mb-1">Module Filter</label>
+                        <select class="form-select" @onchange="OnModuleFilterChanged" disabled="@(selectedCourseId == 0)">
+                            <option value="0">All Modules</option>
+                            @foreach (var m in modules)
+                            {
+                                <option value="@m.Id" selected="@(selectedModuleId == m.Id)">@m.Name</option>
+                            }
+                        </select>
+                    </div>
+                }
+
+                @if (activeLayer == "Activity")
+                {
+                    <div class="@(isTeacher ? "col-md-3" : "col-md-4")">
+                        <label class="form-label small fw-bold mb-1">Activity Filter</label>
+                        <select class="form-select" @onchange="OnActivityFilterChanged" disabled="@(selectedModuleId == 0)">
+                            <option value="0">All Activities</option>
+                            @foreach (var a in activities)
+                            {
+                                <option value="@a.Id" selected="@(selectedActivityId == a.Id)">@a.Name</option>
+                            }
+                        </select>
+                    </div>
+                }
+
+                <div class="@(isTeacher ? "col-md-3" : "col-md-4") ms-auto">
+                    <label class="form-label small fw-bold mb-1">Search @activeLayer Documents</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
+                        <input class="form-control border-start-0" 
+                               placeholder="Filter by name..." 
+                               @bind="searchQuery" 
+                               @bind:event="oninput"
+                               @onkeyup="ApplyLocalFilters" />
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @* ---- Layer Navigation Tabs ---- *@
+    <ul class="nav nav-tabs mb-4 border-bottom shadow-sm bg-white rounded-top px-3 pt-3">
+        <li class="nav-item">
+            <button class="nav-link fw-bold @GetTabClass("Course")" @onclick="@(() => ChangeLayer("Course"))">
+                <i class="bi bi-mortarboard me-2"></i>Course Documents
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link fw-bold @GetTabClass("Module")" @onclick="@(() => ChangeLayer("Module"))">
+                <i class="bi bi-journal-text me-2"></i>Module Documents
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link fw-bold @GetTabClass("Activity")" @onclick="@(() => ChangeLayer("Activity"))">
+                <i class="bi bi-lightning-charge me-2"></i>Activity Documents
+            </button>
+        </li>
+    </ul>
+
+    @* ---- Upload Panel ---- *@
+    @if (showUploadPanel)
+    {
+        <div class="card shadow-sm border-0 mb-4 bg-light animated fadeIn">
+            <div class="card-header bg-white border-bottom-0 pt-3 ps-4 d-flex justify-content-between align-items-center">
+                <div>
+                    <h6 class="fw-bold mb-0">Upload to @activeLayer</h6>
+                    <p class="text-muted small mb-0">Target: @GetUploadTargetName()</p>
+                </div>
+            </div>
+            <div class="card-body px-4 pb-4">
+                <div class="bg-white rounded-3 border border-dashed p-4 text-center mb-3">
+                    <UploadDocumentField 
+                        Label="" 
+                        @bind-Value="documentUpload"
+                        HandleSubmit="SaveDocumentAsync" />
+                </div>
+                
+                @if (!string.IsNullOrEmpty(uploadError))
+                {
+                    <div class="alert alert-danger py-2 small mb-0">
+                        <i class="bi bi-exclamation-triangle me-2"></i>@uploadError
+                    </div>
+                }
+                @if (!string.IsNullOrEmpty(uploadSuccess))
+                {
+                    <div class="alert alert-success py-2 small mb-0">
+                        <i class="bi bi-check-circle me-2"></i>@uploadSuccess
+                    </div>
+                }
+            </div>
+        </div>
+    }
+
+     @* ---- Filter Bar ---- *@
+   @* <div class="card shadow-sm border-0 mb-4 overflow-visible">
+        <div class="card-body p-3">
+            <div class="row g-3 align-items-end">
+                @if (isTeacher)
+                {
+                    <div class="col-md-3">
+                        <label class="form-label small fw-bold mb-1">Course Filter</label>
+                        <select class="form-select" @onchange="OnCourseFilterChanged">
+                            <option value="0">All Courses</option>
+                            @foreach (var c in displayedCourses)
+                            {
+                                <option value="@c.Id" selected="@(selectedCourseId == c.Id)">@c.Name</option>
+                            }
+                        </select>
+                    </div>
+                }
+
+                @if (activeLayer == "Module" || activeLayer == "Activity")
+                {
+                    <div class="@(isTeacher ? "col-md-3" : "col-md-4")">
+                        <label class="form-label small fw-bold mb-1">Module Filter</label>
+                        <select class="form-select" @onchange="OnModuleFilterChanged" disabled="@(selectedCourseId == 0)">
+                            <option value="0">All Modules</option>
+                            @foreach (var m in modules)
+                            {
+                                <option value="@m.Id" selected="@(selectedModuleId == m.Id)">@m.Name</option>
+                            }
+                        </select>
+                    </div>
+                }
+
+                @if (activeLayer == "Activity")
+                {
+                    <div class="@(isTeacher ? "col-md-3" : "col-md-4")">
+                        <label class="form-label small fw-bold mb-1">Activity Filter</label>
+                        <select class="form-select" @onchange="OnActivityFilterChanged" disabled="@(selectedModuleId == 0)">
+                            <option value="0">All Activities</option>
+                            @foreach (var a in activities)
+                            {
+                                <option value="@a.Id" selected="@(selectedActivityId == a.Id)">@a.Name</option>
+                            }
+                        </select>
+                    </div>
+                }
+
+                <div class="@(isTeacher ? "col-md-3" : "col-md-4") ms-auto">
+                    <label class="form-label small fw-bold mb-1">Search @activeLayer Documents</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
+                        <input class="form-control border-start-0" 
+                               placeholder="Filter by name..." 
+                               @bind="searchQuery" 
+                               @bind:event="oninput"
+                               @onkeyup="ApplyLocalFilters" />
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+ *@
+    @* ---- Table ---- *@
+    @if (isLoading)
+    {
+        <div class="text-center py-5">
+            <div class="spinner-border text-primary" role="status"></div>
+            <p class="mt-2 text-muted">Loading documents...</p>
+        </div>
+    }
+    else
+    {
+        <div class="card shadow-sm border-0 overflow-hidden">
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="bg-light text-muted small text-uppercase fw-bold">
+                            <tr>
+                                <th class="ps-4" style="width: 30%;">Document Name</th>
+                                <th style="width: 25%;">Location</th>
+                                <th style="width: 10%;">Size</th>
+                                <th style="width: 15%;">Author</th>
+                                <th style="width: 10%;">Date</th>
+                                <th class="text-end pe-4" style="width: 10%;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="border-top-0">
+                            @if (!filteredDocuments.Any())
+                            {
+                                <tr>
+                                    <td colspan="6" class="text-center py-5">
+                                        <div class="py-4">
+                                            <i class="bi bi-inbox fs-1 text-muted opacity-25"></i>
+                                            @if(!IsUploadTargetSelected())
+                                            {
+                                                <p class="mt-3 text-muted">Please complete the filter selection to view documents.</p>
+                                            }
+                                            else
+                                            {
+                                                <p class="mt-3 text-muted">No documents found matching the current criteria.</p>
+                                            }
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                            else
+                            {
+                                @foreach (var doc in filteredDocuments)
+                                {
+                                    <tr>
+                                        <td class="ps-4">
+                                            <div class="d-flex align-items-start gap-3">
+                                                <a href="@DocumentService.GetDocumentFileUrl(doc.Id, false)" target="document-tab">
+                                                    <div class="rounded-3 bg-white border p-2 d-flex align-items-center justify-content-center" style="width: 44px; height: 44px;">
+                                                        <i class="@GetIconForContentType(doc.ContentType) fs-4 text-primary opacity-75"></i>
+                                                    </div>
+                                                </a>
+                                                <div>
+                                                    <div class="fw-bold text-dark">@doc.DisplayName</div>
+                                                    <div class="text-muted small text-truncate" style="max-width: 250px;">@doc.Description</div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div class="small">
+                                                @if (doc.ActivityId.HasValue && activeLayer == "Activity")
+                                                {
+                                                    <a href="@GetEntityUrl("Activity", doc.ActivityId.Value)" class="text-primary text-decoration-none hover-underline">
+                                                        <i class="bi bi-lightning-charge me-1"></i>Activity: @(doc.ActivityName ?? "Unknown")
+                                                    </a>
+                                                }
+                                                else if (doc.ModuleId.HasValue && activeLayer == "Module")
+                                                {
+                                                    <a href="@GetEntityUrl("Module", doc.ModuleId.Value)" class="text-primary text-decoration-none hover-underline">
+                                                        <i class="bi bi-journal-text me-1"></i>Module: @(doc.ModuleName ?? "Unknown")
+                                                    </a>
+                                                }
+                                                else if (doc.CourseId.HasValue && activeLayer == "Course")
+                                                {
+                                                    <a href="@GetEntityUrl("Course", doc.CourseId.Value)" class="text-primary text-decoration-none hover-underline">
+                                                        <i class="bi bi-mortarboard me-1"></i>Course: @(doc.CourseName ?? "Unknown")
+                                                    </a>
+                                                }
+                                            </div>
+                                        </td>
+                                        <td class="text-muted small">@FormatFileSize(doc.FileSize)</td>
+                                        <td><div class="text-dark small">@doc.UploadedByUserName</div></td>
+                                        <td><div class="text-muted small">@doc.UploadedAt.ToLocalTime().ToString("MMM dd, yyyy")</div></td>
+                                        <td class="text-end pe-4">
+                                            <div class="d-flex justify-content-end gap-1">
+                                                <a href="@DocumentService.GetDocumentFileUrl(doc.Id, true)" 
+                                                   class="btn btn-sm btn-light border" title="Download" target="_blank">
+                                                    <i class="bi bi-download"></i>
+                                                </a>
+                                                <AuthorizeView Roles="Teacher">
+                                                    <button class="btn btn-sm btn-light border" @onclick="() => EditDocument(doc)" title="Edit Metadata">
+                                                        <i class="bi bi-pencil"></i>
+                                                    </button>
+                                                    <button class="btn btn-sm btn-light border text-danger" @onclick="() => DeleteDocument(doc)" title="Delete Document">
+                                                        <i class="bi bi-trash"></i>
+                                                    </button>
+                                                </AuthorizeView>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@if (isEditDialogOpen)
+{
+    <DocumentEditDialog @bind-Open="isEditDialogOpen" Document="editingDocument" OnSave="HandleDocumentSaved" />
+}
+
+<style>
+    .nav-tabs .nav-link { color: #6c757d; border: none; border-bottom: 2px solid transparent; padding-bottom: 12px; }
+    .nav-tabs .nav-link:hover { border-color: transparent; color: #495057; }
+    .nav-tabs .nav-link.active { color: #0d6efd; border-bottom-color: #0d6efd; background-color: transparent; }
+    .border-dashed { border-style: dashed !important; border-width: 2px !important; border-color: #dee2e6 !important; }
+    .hover-underline:hover { text-decoration: underline !important; }
+    .animated { animation-duration: 0.3s; animation-fill-mode: both; }
+    @@keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+    .fadeIn { animation-name: fadeIn; }
+</style>
+
+@code {
+    private bool isTeacher;
+    private string? currentUserId;
+    private bool isLoading = true;
+    private bool showUploadPanel;
+    private bool isEditDialogOpen;
+
+    // Core state
+    private string activeLayer = "Course"; // "Course", "Module", "Activity"
+
+    // Filters
+    private int selectedCourseId;
+    private int selectedModuleId;
+    private int selectedActivityId;
+    private string searchQuery = "";
+
+    // Data
+    private List<CourseDto> displayedCourses = new();
+    private List<ModuleDto> modules = new();
+    private List<ActivityDto> activities = new();
+    private List<DocumentDto> allDocuments = new();
+    private List<DocumentDto> filteredDocuments = new();
+
+    // Upload state
+    private UploadDocumentValue documentUpload = new();
+    private string? uploadError;
+    private string? uploadSuccess;
+    private DocumentDto? editingDocument;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        isTeacher = authState.User.IsInRole("Teacher");
+        currentUserId = authState.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+        await LoadInitialDataAsync();
+    }
+
+    private async Task LoadInitialDataAsync()
+    {
+        isLoading = true;
+
+        if (isTeacher)
+        {
+            var coursesResult = await CourseService.GetAllCoursesAsync(1, 100);
+            displayedCourses = coursesResult?.Items ?? new();
+        }
+        else
+        {
+            var myCourse = await CourseService.GetMyCourseAsync();
+            if (myCourse != null)
+            {
+                selectedCourseId = myCourse.Id;
+                await LoadModulesAsync(myCourse.Id);
+            }
+        }
+
+        await RefreshDocumentList();
+        isLoading = false;
+    }
+
+    private async Task ChangeLayer(string layer)
+    {
+        if (activeLayer == layer) return;
+        activeLayer = layer;
+        searchQuery = "";
+        uploadError = null;
+        uploadSuccess = null;
+        showUploadPanel = false;
+
+        // When switching layers, try to maintain context as much as possible
+        // but hide children and clear them if we're moving up.
+        if (activeLayer == "Course")
+        {
+            selectedActivityId = 0;
+            selectedModuleId = 0;
+        }
+        else if (activeLayer == "Module")
+        {
+            selectedModuleId = 0;
+        }
+
+        await RefreshDocumentList();
+    }
+
+    private string GetTabClass(string layer) => activeLayer == layer ? "active" : "";
+
+    private async Task LoadModulesAsync(int courseId)
+    {
+        modules.Clear();
+        activities.Clear();
+        selectedModuleId = 0;
+        selectedActivityId = 0;
+
+        if (courseId == 0) return;
+
+        var result = await ModuleService.GetAllModulesAsync(1, 100, courseId);
+        modules = result?.Items ?? new();
+    }
+
+    private async Task LoadActivitiesAsync(int moduleId)
+    {
+        activities.Clear();
+        selectedActivityId = 0;
+
+        if (moduleId == 0) return;
+
+        var result = await ActivityService.GetAllActivitiesAsync(1, 100, moduleId);
+        activities = result?.Items ?? new();
+    }
+
+    private async Task OnCourseFilterChanged(ChangeEventArgs e)
+    {
+        selectedCourseId = int.Parse(e.Value?.ToString() ?? "0");
+        await LoadModulesAsync(selectedCourseId);
+        await RefreshDocumentList();
+    }
+
+    private async Task OnModuleFilterChanged(ChangeEventArgs e)
+    {
+        selectedModuleId = int.Parse(e.Value?.ToString() ?? "0");
+        await LoadActivitiesAsync(selectedModuleId);
+        await RefreshDocumentList();
+    }
+
+    private async Task OnActivityFilterChanged(ChangeEventArgs e)
+    {
+        selectedActivityId = int.Parse(e.Value?.ToString() ?? "0");
+        await RefreshDocumentList();
+    }
+
+    private bool IsUploadTargetSelected()
+    {
+        return activeLayer switch
+        {
+            "Course" => selectedCourseId > 0,
+            "Module" => selectedModuleId > 0,
+            "Activity" => selectedActivityId > 0,
+            _ => false
+        };
+    }
+
+    private bool UploadBtnDisabledState()
+    {
+        return activeLayer switch
+        {
+            "Course" => selectedCourseId <= 0,
+            "Module" => selectedModuleId <= 0,
+            "Activity" => selectedActivityId <= 0,
+            _ => true
+        };
+    }
+
+    private async Task RefreshDocumentList()
+    {
+        allDocuments.Clear();
+        filteredDocuments.Clear();
+
+        isLoading = true;
+
+        var query = new DocumentQueryDto
+        {
+            ScopeTarget = activeLayer 
+        };
+
+        if (activeLayer == "Course" && selectedCourseId > 0)
+        {
+            query = query with { CourseId = selectedCourseId };
+        }
+        else if (activeLayer == "Module" && selectedModuleId > 0)
+        {
+            query = query with { ModuleId = selectedModuleId };
+        }
+        else if (activeLayer == "Activity" && selectedActivityId > 0)
+        {
+            query = query with { ActivityId = selectedActivityId };
+        }
+
+        var result = await DocumentService.GetAllDocumentsAsync(1, 100, query);
+        allDocuments = result?.Items ?? new();
+        ApplyLocalFilters();
+        
+        isLoading = false;
+        StateHasChanged();
+    }
+
+    private void ApplyLocalFilters()
+    {
+        IEnumerable<DocumentDto> docs = allDocuments;
+
+        // FILTER BY HIERARCHY
+        if (selectedCourseId > 0)
+        {
+            docs = docs.Where(d => d.ParentCourseId == selectedCourseId);
+        }
+
+        if (selectedModuleId > 0)
+        {
+            docs = docs.Where(d => d.ParentModuleId == selectedModuleId);
+        }
+
+        if (selectedActivityId > 0)
+        {
+            docs = docs.Where(d => d.ParentActivityId == selectedActivityId);
+        }
+        // SEARCH
+        filteredDocuments = docs.Where(d => 
+            string.IsNullOrWhiteSpace(searchQuery) || 
+            d.DisplayName.Contains(searchQuery, StringComparison.OrdinalIgnoreCase) || 
+            d.Description.Contains(searchQuery, StringComparison.OrdinalIgnoreCase) ||
+            (d.CourseName?.Contains(searchQuery, StringComparison.OrdinalIgnoreCase) ?? false) ||
+            (d.ModuleName?.Contains(searchQuery, StringComparison.OrdinalIgnoreCase) ?? false) ||
+            (d.ActivityName?.Contains(searchQuery, StringComparison.OrdinalIgnoreCase) ?? false)
+        ).ToList();
+    }
+
+    private void ToggleUploadPanel()
+    {
+        showUploadPanel = !showUploadPanel;
+        uploadError = null;
+        uploadSuccess = null;
+        documentUpload = new UploadDocumentValue();
+    }
+
+    private string GetUploadTargetName()
+    {
+        if (activeLayer == "Activity")
+            return selectedActivityId > 0 ? activities.FirstOrDefault(a => a.Id == selectedActivityId)?.Name ?? "Selected Activity" : "None Selected";
+        
+        if (activeLayer == "Module")
+            return selectedModuleId > 0 ? modules.FirstOrDefault(m => m.Id == selectedModuleId)?.Name ?? "Selected Module" : "None Selected";
+        
+        if (activeLayer == "Course")
+            return selectedCourseId > 0 ? displayedCourses.FirstOrDefault(c => c.Id == selectedCourseId)?.Name ?? "Selected Course" : "None Selected";
+            
+        return "Unknown";
+    }
+
+    private async Task SaveDocumentAsync()
+    {
+        uploadError = null;
+        uploadSuccess = null;
+
+        if (!IsUploadTargetSelected())
+        {
+            uploadError = $"Please select a {activeLayer} filter before uploading.";
+            return;
+        }
+
+        if (documentUpload.File == null)
+        {
+            uploadError = "Please select a file.";
+            return;
+        }
+
+        var dto = new CreateDocumentDto
+        {
+            Description = documentUpload.Description,
+            CourseId = activeLayer == "Course" ? selectedCourseId : null,
+            ModuleId = activeLayer == "Module" ? selectedModuleId : null,
+            ActivityId = activeLayer == "Activity" ? selectedActivityId : null
+        };
+
+        var result = await DocumentService.CreateDocumentAsync(dto, documentUpload);
+        if (result != null)
+        {
+            uploadSuccess = $"Document added successfully to {activeLayer} layer.";
+            documentUpload = new UploadDocumentValue();
+            await RefreshDocumentList();
+            await Task.Delay(2000);
+            uploadSuccess = null;
+            showUploadPanel = false;
+        }
+        else
+        {
+            uploadError = "Failed to upload document.";
+        }
+    }
+
+    private string GetEntityUrl(string type, int id) => type switch
+    {
+        "Course" => isTeacher ? $"/admin/courses/{id}/details" : $"/student/overview",
+        "Module" => isTeacher ? $"/admin/modules/{id}/details" : $"/modules/{id}/details",
+        "Activity" => isTeacher ? $"/admin/activities/{id}/details" : $"/activities/{id}/details",
+        _ => "#"
+    };
+
+    private string GetIconForContentType(string contentType) => contentType.ToLower() switch
+    {
+        var ct when ct.Contains("pdf") => "bi bi-file-pdf",
+        var ct when ct.Contains("word") || ct.Contains("officedocument.word") => "bi bi-file-word",
+        var ct when ct.Contains("excel") || ct.Contains("officedocument.sheet") => "bi bi-file-excel",
+        var ct when ct.Contains("powerpoint") || ct.Contains("officedocument.presentation") => "bi bi-file-ppt",
+        var ct when ct.Contains("image") => "bi bi-file-image",
+        _ => "bi bi-file-earmark-text"
+    };
+
+    private string FormatFileSize(long bytes)
+    {
+        string[] suffixes = { "B", "KB", "MB", "GB", "TB" };
+        int i = 0;
+        double dblSByte = bytes;
+        while (i < suffixes.Length - 1 && dblSByte >= 1024)
+        {
+            i++; dblSByte /= 1024;
+        }
+        return $"{dblSByte:n1} {suffixes[i]}";
+    }
+
+    private void EditDocument(DocumentDto doc) => (editingDocument, isEditDialogOpen) = (doc, true);
+
+    private async Task HandleDocumentSaved(DocumentDto updated) => await RefreshDocumentList();
+
+    private async Task DeleteDocument(DocumentDto doc)
+    {
+        await DocumentService.DeleteDocumentAsync(doc.Id);
+        await RefreshDocumentList();
+    }
+}

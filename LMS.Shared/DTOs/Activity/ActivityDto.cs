@@ -1,7 +1,4 @@
-﻿
-using Domain.Models.Enums;
-
-namespace LMS.Shared.DTOs.Activity
+﻿namespace LMS.Shared.DTOs.Activity
 {
     /// <summary>
     /// Represents an activity with basic information and computed counts.
@@ -15,12 +12,9 @@ namespace LMS.Shared.DTOs.Activity
         public required string ModuleName { get; set; }
         public required string Name { get; set; }
         public required string Description { get; set; }
-
-        /// <summary>
-        /// Type of activity (e.g., "Assignment", "Quiz", "Lecture", "Discussion").
-        /// </summary>
-        public required ActivityType Type { get; set; }
-        public required DateTime StartTime { get; set; }
+        public required int ActivityTypeId { get; set; } // FK
+        public required string ActivityTypeName { get; set; }
+        public required DateTime? StartTime { get; set; }
         public required DateTime EndTime { get; set; }
 
         /// <summary>

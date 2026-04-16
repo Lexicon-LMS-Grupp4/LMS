@@ -1,0 +1,177 @@
+@page "/admin"
+@attribute [Authorize(Roles = "Teacher")]
+@using LMS.Shared.DTOs.Course
+@inject ICourseService CourseService
+@inject IModuleService ModuleService
+@inject IActivityService ActivityService
+@inject IUserService UserService
+
+<PageTitle>Teacher Dashboard</PageTitle>
+
+<div class="container-fluid py-4">
+
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+        <div>
+            <h2 class="mb-0">Teacher Dashboard</h2>
+            <p class="text-muted small mb-0">Overview of your LMS content and quick links to administration.</p>
+        </div>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="text-center py-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2 text-muted">Loading statistics…</p>
+        </div>
+    }
+    else if (!string.IsNullOrEmpty(loadError))
+    {
+        <div class="alert alert-danger">
+            <p class="mb-2">@loadError</p>
+            <button type="button" class="btn btn-outline-danger btn-sm" @onclick="LoadAsync">Retry</button>
+        </div>
+    }
+    else
+    {
+        <div class="row g-3 mb-4">
+            <div class="col-6 col-md-3">
+                <div class="card text-center h-100 border-primary border-opacity-25">
+                    <div class="card-body py-3">
+                        <div class="fs-2 fw-bold text-primary">@courseTotal</div>
+                        <div class="text-muted small">Courses</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="card text-center h-100 border-success border-opacity-25">
+                    <div class="card-body py-3">
+                        <div class="fs-2 fw-bold text-success">@moduleTotal</div>
+                        <div class="text-muted small">Modules</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="card text-center h-100 border-warning border-opacity-25">
+                    <div class="card-body py-3">
+                        <div class="fs-2 fw-bold text-warning">@activityTotal</div>
+                        <div class="text-muted small">Activities</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="card text-center h-100 border-secondary border-opacity-25">
+                    <div class="card-body py-3">
+                        <div class="fs-2 fw-bold text-secondary">@userTotal</div>
+                        <div class="text-muted small">Users</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-lightning-charge me-2"></i>Quick links</h6>
+            </div>
+            <div class="card-body">
+                <div class="d-flex flex-wrap gap-2">
+                    <a class="btn btn-outline-primary btn-sm" href="/admin/courses">Courses</a>
+                    <a class="btn btn-outline-primary btn-sm" href="/admin/documents">Documents</a>
+                    <a class="btn btn-outline-primary btn-sm" href="/admin/users">Users</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+                <h6 class="mb-0"><i class="bi bi-journal-bookmark me-2"></i>Recent courses</h6>
+                <a class="btn btn-sm btn-primary" href="/admin/courses">Manage all</a>
+            </div>
+            <div class="card-body p-0">
+                @if (!recentCourses.Any())
+                {
+                    <p class="text-muted p-3 mb-0">No courses yet. Create one from the Courses page.</p>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0 align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Name</th>
+                                    <th class="d-none d-md-table-cell">Start</th>
+                                    <th class="text-end">Modules</th>
+                                    <th class="text-end">Students</th>
+                                    <th class="text-end pe-3">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var c in recentCourses)
+                                {
+                                    <tr>
+                                        <td>
+                                            <div class="fw-semibold">@c.Name</div>
+                                            <div class="text-muted small text-truncate" style="max-width: 280px;">@c.Description</div>
+                                        </td>
+                                        <td class="d-none d-md-table-cell text-muted small">@c.StartDate.ToString("yyyy-MM-dd")</td>
+                                        <td class="text-end">@c.ModuleCount</td>
+                                        <td class="text-end">@c.StudentCount</td>
+                                        <td class="text-end pe-3">
+                                            <a class="btn btn-sm btn-outline-secondary" href="@($"/admin/courses/{c.Id}/details")">Open</a>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private bool isLoading = true;
+    private string? loadError;
+    private int courseTotal;
+    private int moduleTotal;
+    private int activityTotal;
+    private int userTotal;
+    private List<CourseDto> recentCourses = [];
+
+    protected override async Task OnInitializedAsync()
+        => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        isLoading = true;
+        loadError = null;
+        StateHasChanged();
+
+        try
+        {
+            var coursesCountTask = CourseService.GetAllCoursesAsync(1, 1);
+            var modulesCountTask = ModuleService.GetAllModulesAsync(1, 1);
+            var activitiesCountTask = ActivityService.GetAllActivitiesAsync(1, 2);
+            var usersCountTask = UserService.GetAllUsersAsync(1, 1);
+            var recentTask = CourseService.GetAllCoursesAsync(1, 8);
+
+            await Task.WhenAll(coursesCountTask, modulesCountTask, activitiesCountTask, usersCountTask, recentTask);
+
+            courseTotal = (await coursesCountTask)?.TotalCount ?? 0;
+            moduleTotal = (await modulesCountTask)?.TotalCount ?? 0;
+            activityTotal = (await activitiesCountTask)?.TotalCount ?? 0;
+            userTotal = (await usersCountTask)?.TotalCount ?? 0;
+            recentCourses = (await recentTask)?.Items ?? [];
+        }
+        catch (Exception ex)
+        {
+            loadError = $"Failed to load dashboard. {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+}

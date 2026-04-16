@@ -47,8 +47,7 @@ internal static class IdentityComponentsEndpointRouteBuilderExtensions
             ClaimsPrincipal user,
             [FromServices] SignInManager<ApplicationUser> signInManager,
             [FromServices] ITokenStorage tokenStorage,
-            [FromServices] UserManager<ApplicationUser> userManager,
-            [FromForm] string returnUrl) =>
+            [FromServices] UserManager<ApplicationUser> userManager) =>
         {
             var userId = userManager.GetUserId(user);
 
@@ -56,7 +55,7 @@ internal static class IdentityComponentsEndpointRouteBuilderExtensions
                 await tokenStorage.RemoveTokensAsync(userId);
 
             await signInManager.SignOutAsync();
-            return TypedResults.LocalRedirect($"~/{returnUrl}");
+            return TypedResults.LocalRedirect("~/");
         });
 
         accountGroup.MapPost("/PasskeyCreationOptions", async (

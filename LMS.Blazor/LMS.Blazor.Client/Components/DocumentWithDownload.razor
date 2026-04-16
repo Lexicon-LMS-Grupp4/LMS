@@ -1,0 +1,56 @@
+@using LMS.Shared.DTOs.Document
+@inject IDocumentService DocumentService
+
+@if (Document is not null)
+{
+    <div class="d-flex align-items-center gap-2 border rounded p-2 bg-light">
+        <i class="bi bi-file-earmark-text fs-4 text-muted flex-shrink-0"></i>
+
+        <div class="flex-grow-1 overflow-hidden">
+            <div class="fw-semibold small text-truncate">
+                <a href="@GetFileUrl()" target="_blank" class="text-decoration-none">
+                    @Document.DisplayName
+                </a>
+            </div>
+
+            @if (ShowDescription && !string.IsNullOrWhiteSpace(Document.Description))
+            {
+                <div class="text-muted small text-truncate">@Document.Description</div>
+            }
+
+            @if (ShowUploadedBy && !string.IsNullOrWhiteSpace(Document.UploadedByUserName))
+            {
+                <div class="text-muted small">by @Document.UploadedByUserName</div>
+            }
+
+            @if (ShowUploadedDate)
+            {
+                <div class="text-muted small">@Document.UploadedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</div>
+            }
+        </div>
+
+        <a href="@GetFileUrl(true)"
+           class="btn btn-sm btn-outline-primary flex-shrink-0"
+           target="_blank"
+           title="Download">
+            <i class="bi bi-download"></i>
+        </a>
+    </div>
+}
+
+@code {
+    [Parameter] public DocumentDto? Document { get; set; }
+    [Parameter] public bool ShowUploadedBy { get; set; } = true;
+    [Parameter] public bool ShowUploadedDate { get; set; } = true;
+    [Parameter] public bool ShowDescription { get; set; } = true;
+    [Parameter] public bool ShowDeleteButton { get; set; } = false;
+    [Parameter] public EventCallback<int> OnDeleted { get; set; }
+
+    private string GetFileUrl(bool download = false)
+    {
+        if (Document is null)
+            return "#";
+
+        return DocumentService.GetDocumentFileUrl(Document.Id, download);
+    }
+}

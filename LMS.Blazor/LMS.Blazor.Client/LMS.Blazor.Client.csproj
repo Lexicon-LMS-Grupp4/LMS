@@ -11,12 +11,17 @@
 
   <ItemGroup>
     <PackageReference Include="BlazorBlueprint.Components" Version="3.7.3" />
+    <PackageReference Include="BlazorBlueprint.Icons.Lucide" Version="2.0.0" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.3" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Authentication" Version="10.0.3" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\LMS.Shared\LMS.Shared.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Extensions\" />
   </ItemGroup>
 
 </Project>

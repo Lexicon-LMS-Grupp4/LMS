@@ -5,6 +5,7 @@ public interface IServiceManager
     IAuthService AuthService { get; }
     ICourseService CourseService { get; }
     IModuleService ModuleService { get; }
+    IActivityTypeService ActivityTypeService { get; }
     IActivityService ActivityService { get; }
     IDocumentService DocumentService { get; }
     ISubmissionService SubmissionService { get; }

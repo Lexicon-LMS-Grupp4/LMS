@@ -8,6 +8,7 @@ using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
 
+[IgnoreAntiforgeryToken]
 [Route("api/proxy")]
 [ApiController]
 [Authorize]
@@ -47,11 +48,11 @@ public class ApiProxyController : ControllerBase
         {
             using var response = await ForwardRequestToApiAsync(client, endpoint, accessToken, ct);
 
-           
+
             if (response.StatusCode == HttpStatusCode.Unauthorized)
             {
                 var newTokens = await TryRefreshTokenAsync(client, userId, ct);
-                if(newTokens == null)
+                if (newTokens == null)
                 {
                     await _tokenStorage.RemoveTokensAsync(userId);
                     return Unauthorized("Token refresh failed");
@@ -79,7 +80,7 @@ public class ApiProxyController : ControllerBase
         try
         {
             TokenDto? token = await _tokenStorage.GetTokensAsync(userId);
-            if(token == null)
+            if (token == null)
                 return null;
 
             var refreshEndPoint = "api/token/refresh";
@@ -88,7 +89,7 @@ public class ApiProxyController : ControllerBase
 
             var response = await client.PostAsync(refreshEndPoint, content, ct);
 
-            if(!response.IsSuccessStatusCode)
+            if (!response.IsSuccessStatusCode)
                 return null;
 
             var responseContwnt = await response.Content.ReadAsStringAsync(ct);
@@ -97,7 +98,7 @@ public class ApiProxyController : ControllerBase
                 PropertyNameCaseInsensitive = true,
             });
 
-            if(newTokens == null)
+            if (newTokens == null)
                 return null;
 
             await _tokenStorage.StoreTokensAsync(userId, newTokens);
@@ -105,10 +106,8 @@ public class ApiProxyController : ControllerBase
             return newTokens;
 
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-
-            _logger.LogError(ex, "Error refresh tokens for user: {userId}", userId);
             return null;
         }
     }
@@ -134,16 +133,64 @@ public class ApiProxyController : ControllerBase
         return new EmptyResult();
     }
 
-    private async Task<HttpResponseMessage> ForwardRequestToApiAsync(HttpClient client, string endpoint, string accessToken, CancellationToken ct)
+    private async Task<HttpResponseMessage> ForwardRequestToApiAsync(
+    HttpClient client,
+    string endpoint,
+    string accessToken,
+    CancellationToken ct)
     {
         var targetUri = BuildTargetUri(client.BaseAddress!, endpoint);
 
         var requestMessage = new HttpRequestMessage(new HttpMethod(Request.Method), targetUri);
         requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
 
-        if (Request.ContentLength > 0 || Request.Headers.ContainsKey("Transfer-Encoding"))
+        if (Request.HasFormContentType)
         {
-            requestMessage.Content = new StreamContent(Request.Body);
+            var form = await Request.ReadFormAsync(ct);
+            var multipartContent = new MultipartFormDataContent();
+
+            foreach (var field in form)
+            {
+                foreach (var value in field.Value)
+                {
+                    multipartContent.Add(new StringContent(value ?? string.Empty), field.Key);
+                }
+            }
+
+            foreach (var file in form.Files)
+            {
+
+                await using var sourceStream = file.OpenReadStream();
+                using var ms = new MemoryStream();
+                await sourceStream.CopyToAsync(ms, ct);
+
+                var fileContent = new ByteArrayContent(ms.ToArray());
+
+                if (!string.IsNullOrWhiteSpace(file.ContentType))
+                {
+                    fileContent.Headers.ContentType =
+                        MediaTypeHeaderValue.Parse(file.ContentType);
+                }
+
+                multipartContent.Add(fileContent, file.Name, file.FileName);
+            }
+
+            requestMessage.Content = multipartContent;
+        }
+        else if (Request.ContentLength > 0 || Request.Headers.ContainsKey("Transfer-Encoding"))
+        {
+            Request.EnableBuffering();
+
+            if (Request.Body.CanSeek)
+                Request.Body.Position = 0;
+
+            using var buffer = new MemoryStream();
+            await Request.Body.CopyToAsync(buffer, ct);
+
+            if (Request.Body.CanSeek)
+                Request.Body.Position = 0;
+
+            requestMessage.Content = new ByteArrayContent(buffer.ToArray());
 
             if (!string.IsNullOrWhiteSpace(Request.ContentType))
             {
@@ -193,7 +240,8 @@ public class ApiProxyController : ControllerBase
             "Authorization",
             "Connection",
             "Content-Length",
-            "Transfer-Encoding"
+            "Transfer-Encoding",
+            "Content-Type"
         };
 
         return skipHeaders.Contains(headerName, StringComparer.OrdinalIgnoreCase);

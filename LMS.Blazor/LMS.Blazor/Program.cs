@@ -1,5 +1,5 @@
+using BlazorBlueprint.Components;
 using Domain.Models.Entities;
-using LMS.Blazor.Client.Services;
 using LMS.Blazor.Components;
 using LMS.Blazor.Components.Account;
 using LMS.Blazor.Data;
@@ -7,7 +7,6 @@ using LMS.Blazor.Services;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using System.Net.Http.Headers;
-using BlazorBlueprint.Components;
 
 namespace LMS.Blazor;
 
@@ -72,11 +71,6 @@ public class Program
         });
 
         builder.Services.AddSingleton<ITokenStorage, TokenStorageService>();
-        //  builder.Services.AddScoped<IApiService, ClientApiService>();
-        builder.Services.AddScoped<IApiService, ServerNoOpApiService>();
-        builder.Services.AddScoped<ICourseService, ServerNoOpCourseService>();
-        builder.Services.AddScoped<IModuleService, ServerNoOpModuleService>();
-        builder.Services.AddScoped<IActivityService, ServerNoOpActivityService>();
 
         var app = builder.Build();
 

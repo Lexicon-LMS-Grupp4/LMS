@@ -5,9 +5,19 @@
 /// Used in PUT  /api/submissions/{id} requests.
 /// Students can only update their own submissions before the deadline.
 /// </summary>
-public record UpdateSubmissionDto
+public class UpdateSubmissionDto : CreateSubmissionDto
 {
-    public int ActivityId { get; init; }
-    public string Body { get; init; } = string.Empty;
-    public int? DocumentId { get; init; }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
